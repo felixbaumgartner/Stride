@@ -1,0 +1,14 @@
+{
+  "name": "stride",
+  "version": "1.0.0",
+  "description": "A personal work diary app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "npx nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "sql.js": "^1.11.0"
+  }
+}

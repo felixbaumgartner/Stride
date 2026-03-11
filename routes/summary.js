@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { dbAll, dbGet } = require('../db');
 
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
 function getISOWeekDates(weekStr) {
   // Parse YYYY-Www format, or default to current week
   let year, week;
@@ -35,10 +38,10 @@ function getISOWeekDates(weekStr) {
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-router.get('/', (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const { from, to, week } = getISOWeekDates(req.query.week);
 
-  const tasks = dbAll(
+  const tasks = await dbAll(
     'SELECT * FROM tasks WHERE date >= ? AND date <= ? ORDER BY date ASC, position ASC',
     [from, to]
   );
@@ -63,15 +66,15 @@ router.get('/', (req, res) => {
     }
   }
 
-  const ideasCreated = dbGet(
+  const ideasCreated = (await dbGet(
     'SELECT COUNT(*) as count FROM ideas WHERE created_at >= ? AND created_at < ?',
     [from + 'T00:00:00', to + 'T23:59:59']
-  )?.count || 0;
+  ))?.count || 0;
 
-  const ideasConverted = dbGet(
+  const ideasConverted = (await dbGet(
     'SELECT COUNT(*) as count FROM ideas WHERE converted = 1 AND updated_at >= ? AND updated_at < ?',
     [from + 'T00:00:00', to + 'T23:59:59']
-  )?.count || 0;
+  ))?.count || 0;
 
   res.json({
     week,
@@ -83,6 +86,6 @@ router.get('/', (req, res) => {
     ideasCreated,
     ideasConverted
   });
-});
+}));
 
 module.exports = router;

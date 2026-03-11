@@ -1,22 +1,15 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 
-const DB_PATH = path.join(__dirname, 'stride.db');
-let db;
-let inTransaction = false;
+let client;
 
 async function initDb() {
-  const SQL = await initSqlJs();
+  client = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+    intMode: 'number',
+  });
 
-  if (fs.existsSync(DB_PATH)) {
-    const buffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
-  }
-
-  db.run(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -31,7 +24,7 @@ async function initDb() {
     )
   `);
 
-  db.run(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS ideas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -43,7 +36,7 @@ async function initDb() {
     )
   `);
 
-  db.run(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS principles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       text TEXT NOT NULL,
@@ -54,7 +47,7 @@ async function initDb() {
     )
   `);
 
-  db.run(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS vision (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -66,55 +59,41 @@ async function initDb() {
     )
   `);
 
-  db.run('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');
-
-  saveDb();
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');
 }
 
-function saveDb() {
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+async function dbAll(sql, params = []) {
+  const result = await client.execute({ sql, args: params });
+  return result.rows;
 }
 
-function dbAll(sql, params = []) {
-  const stmt = db.prepare(sql);
-  if (params.length) stmt.bind(params);
-  const results = [];
-  while (stmt.step()) {
-    results.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return results;
+async function dbGet(sql, params = []) {
+  const rows = await dbAll(sql, params);
+  return rows[0] || null;
 }
 
-function dbGet(sql, params = []) {
-  const results = dbAll(sql, params);
-  return results[0] || null;
+async function dbRun(sql, params = []) {
+  const result = await client.execute({ sql, args: params });
+  return { lastInsertRowid: result.lastInsertRowid };
 }
 
-function dbRun(sql, params = []) {
-  db.run(sql, params);
-  if (!inTransaction) saveDb();
-  const row = db.exec('SELECT last_insert_rowid() as id');
-  const lastInsertRowid = row.length ? row[0].values[0][0] : 0;
-  return { lastInsertRowid };
-}
-
-function dbTransaction(fn) {
-  inTransaction = true;
-  db.run('BEGIN TRANSACTION');
-  try {
-    const result = fn();
-    db.run('COMMIT');
-    inTransaction = false;
-    saveDb();
-    return result;
-  } catch (err) {
-    db.run('ROLLBACK');
-    inTransaction = false;
-    throw err;
-  }
+async function dbTransaction(fn) {
+  return await client.transaction(async (tx) => {
+    const txAll = async (sql, params = []) => {
+      const result = await tx.execute({ sql, args: params });
+      return result.rows;
+    };
+    const txGet = async (sql, params = []) => {
+      const rows = await txAll(sql, params);
+      return rows[0] || null;
+    };
+    const txRun = async (sql, params = []) => {
+      const result = await tx.execute({ sql, args: params });
+      return { lastInsertRowid: result.lastInsertRowid };
+    };
+    return await fn({ dbAll: txAll, dbGet: txGet, dbRun: txRun });
+  });
 }
 
 module.exports = { initDb, dbAll, dbGet, dbRun, dbTransaction };

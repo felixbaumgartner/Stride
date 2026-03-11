@@ -1,3 +1,5 @@
 node_modules/
 stride.db
 .env
+
+.vercel

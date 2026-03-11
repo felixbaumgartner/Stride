@@ -28,8 +28,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Stride is running at http://localhost:${PORT}`);
+const dbReady = initDb();
+
+// Only listen locally (Vercel handles this in serverless mode)
+if (process.env.VERCEL !== '1') {
+  dbReady.then(() => {
+    app.listen(PORT, () => {
+      console.log(`Stride is running at http://localhost:${PORT}`);
+    });
   });
-});
+}
+
+module.exports = app;

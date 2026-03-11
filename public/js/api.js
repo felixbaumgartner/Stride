@@ -40,6 +40,16 @@ window.API = (() => {
     deleteVision(id) { return request(`/api/vision/${id}`, { method: 'DELETE' }); },
 
     // Summary
-    getSummary(week) { return request(`/api/summary${week ? '?week=' + week : ''}`); }
+    getSummary(week) { return request(`/api/summary${week ? '?week=' + week : ''}`); },
+
+    // Search
+    search(query) { return request(`/api/search?q=${encodeURIComponent(query)}`); },
+
+    // Export
+    async exportMarkdown() {
+      const res = await fetch('/api/export');
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    }
   };
 })();

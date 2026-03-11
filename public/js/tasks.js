@@ -64,7 +64,18 @@ window.TasksTab = (() => {
         onSave: (name, details) => API.updateTask(id, { title: name, details }).then(load)
       });
     } else if (action === 'delete') {
-      window.AppModal.confirmDelete(() => API.deleteTask(id).then(load));
+      window.AppModal.confirmDelete(async () => {
+        const deleted = { ...task };
+        await API.deleteTask(id);
+        load();
+        window.AppToast.show({
+          message: 'Task deleted',
+          undoCallback: async () => {
+            await API.createTask({ title: deleted.title, details: deleted.details, date: deleted.date });
+            load();
+          }
+        });
+      });
     }
   }
 

@@ -44,7 +44,18 @@ window.VisionTab = (() => {
         onSave: (name, details) => API.updateVision(id, { title: name, details }).then(load)
       });
     } else if (action === 'delete') {
-      window.AppModal.confirmDelete(() => API.deleteVision(id).then(load));
+      window.AppModal.confirmDelete(async () => {
+        const deleted = { ...entry };
+        await API.deleteVision(id);
+        load();
+        window.AppToast.show({
+          message: 'Vision entry deleted',
+          undoCallback: async () => {
+            await API.createVision({ title: deleted.title, details: deleted.details, time_horizon: deleted.time_horizon });
+            load();
+          }
+        });
+      });
     }
   }
 

@@ -48,7 +48,18 @@ window.IdeasTab = (() => {
       const today = new Date().toISOString().split('T')[0];
       API.convertIdea(id, today).then(load);
     } else if (action === 'delete') {
-      window.AppModal.confirmDelete(() => API.deleteIdea(id).then(load));
+      window.AppModal.confirmDelete(async () => {
+        const deleted = { ...idea };
+        await API.deleteIdea(id);
+        load();
+        window.AppToast.show({
+          message: 'Idea deleted',
+          undoCallback: async () => {
+            await API.createIdea({ title: deleted.title, details: deleted.details });
+            load();
+          }
+        });
+      });
     }
   }
 

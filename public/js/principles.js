@@ -44,7 +44,18 @@ window.PrinciplesTab = (() => {
         onSave: (name, details) => API.updatePrinciple(id, { text: name, details }).then(load)
       });
     } else if (action === 'delete') {
-      window.AppModal.confirmDelete(() => API.deletePrinciple(id).then(load));
+      window.AppModal.confirmDelete(async () => {
+        const deleted = { ...principle };
+        await API.deletePrinciple(id);
+        load();
+        window.AppToast.show({
+          message: 'Principle deleted',
+          undoCallback: async () => {
+            await API.createPrinciple({ text: deleted.text, details: deleted.details });
+            load();
+          }
+        });
+      });
     }
   }
 

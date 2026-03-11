@@ -1,24 +1,34 @@
 const { createClient } = require('@libsql/client');
 
 let client;
+let initialized = false;
+
+function getClient() {
+  if (!client) {
+    client = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+      intMode: 'number',
+    });
+  }
+  return client;
+}
 
 async function ensureColumn(tableName, columnName, definition) {
-  const result = await client.execute(`PRAGMA table_info(${tableName})`);
+  const db = getClient();
+  const result = await db.execute(`PRAGMA table_info(${tableName})`);
   const hasColumn = result.rows.some((row) => row.name === columnName);
 
   if (!hasColumn) {
-    await client.execute(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+    await db.execute(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
   }
 }
 
 async function initDb() {
-  client = createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
-    intMode: 'number',
-  });
+  if (initialized) return;
+  const db = getClient();
 
-  await client.execute(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -36,7 +46,7 @@ async function initDb() {
     )
   `);
 
-  await client.execute(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS ideas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -51,7 +61,7 @@ async function initDb() {
     )
   `);
 
-  await client.execute(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS principles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       text TEXT NOT NULL,
@@ -62,7 +72,7 @@ async function initDb() {
     )
   `);
 
-  await client.execute(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS vision (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -74,7 +84,7 @@ async function initDb() {
     )
   `);
 
-  await client.execute(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS weekly_reviews (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       week TEXT NOT NULL UNIQUE,
@@ -94,15 +104,18 @@ async function initDb() {
   await ensureColumn('ideas', 'principle_id', 'INTEGER');
   await ensureColumn('ideas', 'vision_id', 'INTEGER');
 
-  await client.execute('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
-  await client.execute('CREATE INDEX IF NOT EXISTS idx_tasks_focus_date ON tasks(date, focus)');
-  await client.execute('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');
-  await client.execute('CREATE INDEX IF NOT EXISTS idx_ideas_archived ON ideas(archived)');
-  await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_reviews_week ON weekly_reviews(week)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_focus_date ON tasks(date, focus)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_ideas_archived ON ideas(archived)');
+  await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_reviews_week ON weekly_reviews(week)');
+
+  initialized = true;
 }
 
 async function dbAll(sql, params = []) {
-  const result = await client.execute({ sql, args: params });
+  await initDb();
+  const result = await getClient().execute({ sql, args: params });
   return result.rows;
 }
 
@@ -112,12 +125,14 @@ async function dbGet(sql, params = []) {
 }
 
 async function dbRun(sql, params = []) {
-  const result = await client.execute({ sql, args: params });
+  await initDb();
+  const result = await getClient().execute({ sql, args: params });
   return { lastInsertRowid: result.lastInsertRowid };
 }
 
 async function dbTransaction(fn) {
-  const tx = await client.transaction('write');
+  await initDb();
+  const tx = await getClient().transaction('write');
   try {
     const txAll = async (sql, params = []) => {
       const result = await tx.execute({ sql, args: params });

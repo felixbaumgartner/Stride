@@ -13,6 +13,13 @@ const searchRouter = require('./routes/search');
 const app = express();
 const PORT = 3000;
 
+// Ensure DB is initialized before handling any request
+const dbReady = initDb();
+app.use(async (req, res, next) => {
+  await dbReady;
+  next();
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -28,7 +35,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-const dbReady = initDb();
+// Serve index.html for any non-API, non-static routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Only listen locally (Vercel handles this in serverless mode)
 if (process.env.VERCEL !== '1') {

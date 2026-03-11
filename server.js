@@ -34,11 +34,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: message });
 });
 
-initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Stride is running at http://localhost:${PORT}`);
-  });
-}).catch((error) => {
-  console.error('Failed to start Stride', error);
-  process.exit(1);
+const dbReady = initDb().catch((error) => {
+  console.error('Failed to initialize database', error);
 });
+
+if (!process.env.VERCEL) {
+  dbReady.then(() => {
+    app.listen(PORT, () => {
+      console.log(`Stride is running at http://localhost:${PORT}`);
+    });
+  });
+}
+
+module.exports = app;

@@ -16,6 +16,15 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+const dbReady = initDb().catch((error) => {
+  console.error('Failed to initialize database', error);
+});
+
+app.use('/api', async (req, res, next) => {
+  await dbReady;
+  next();
+});
+
 app.use('/api/tasks', tasksRouter);
 app.use('/api/ideas', ideasRouter);
 app.use('/api/principles', principlesRouter);
@@ -32,10 +41,6 @@ app.use((err, req, res, next) => {
   const message = err?.message || 'Unexpected server error';
   console.error(err);
   res.status(500).json({ error: message });
-});
-
-const dbReady = initDb().catch((error) => {
-  console.error('Failed to initialize database', error);
 });
 
 if (!process.env.VERCEL) {

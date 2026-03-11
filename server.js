@@ -11,14 +11,7 @@ const exportRouter = require('./routes/export');
 const searchRouter = require('./routes/search');
 
 const app = express();
-const PORT = 3000;
-
-// Ensure DB is initialized before handling any request
-const dbReady = initDb();
-app.use(async (req, res, next) => {
-  await dbReady;
-  next();
-});
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -35,18 +28,17 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Serve index.html for any non-API, non-static routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.use((err, req, res, next) => {
+  const message = err?.message || 'Unexpected server error';
+  console.error(err);
+  res.status(500).json({ error: message });
 });
 
-// Only listen locally (Vercel handles this in serverless mode)
-if (process.env.VERCEL !== '1') {
-  dbReady.then(() => {
-    app.listen(PORT, () => {
-      console.log(`Stride is running at http://localhost:${PORT}`);
-    });
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Stride is running at http://localhost:${PORT}`);
   });
-}
-
-module.exports = app;
+}).catch((error) => {
+  console.error('Failed to start Stride', error);
+  process.exit(1);
+});

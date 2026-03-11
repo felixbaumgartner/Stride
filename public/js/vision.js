@@ -9,53 +9,50 @@ window.VisionTab = (() => {
       return;
     }
 
-    list.innerHTML = entries.map(v => `
-      <div class="item-card" data-id="${v.id}">
+    list.innerHTML = entries.map((entry) => `
+      <div class="item-card" data-id="${entry.id}">
         <div class="item-main">
-          <span class="item-title" data-action="expand">${escapeHtml(v.title)}</span>
-          ${v.time_horizon ? `<span class="horizon-badge">${escapeHtml(v.time_horizon)}</span>` : ''}
+          <span class="item-title">${escapeHtml(entry.title)}</span>
+          ${entry.time_horizon ? `<span class="horizon-badge">${escapeHtml(entry.time_horizon)}</span>` : ''}
           <div class="item-actions">
             <button class="action-btn" data-action="edit" title="Edit">&#9998;</button>
             <button class="action-btn delete-btn" data-action="delete" title="Delete">&#10005;</button>
           </div>
         </div>
-        <div class="item-details ${v.details ? 'visible' : ''}" data-action="expand-target">${escapeHtml(v.details)}</div>
+        ${entry.details ? `<div class="item-details visible">${escapeHtml(entry.details)}</div>` : ''}
       </div>
     `).join('');
   }
 
-  function handleClick(e) {
-    const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
+  function handleClick(event) {
+    const action = event.target.dataset.action || event.target.closest('[data-action]')?.dataset.action;
     if (!action) return;
 
-    const card = e.target.closest('.item-card');
+    const card = event.target.closest('.item-card');
     if (!card) return;
     const id = Number(card.dataset.id);
-    const entry = entries.find(v => v.id === id);
+    const entry = entries.find((item) => item.id === id);
     if (!entry) return;
 
-    if (action === 'expand') {
-      card.querySelector('.item-details').classList.toggle('visible');
-    } else if (action === 'edit') {
+    if (action === 'edit') {
       window.AppModal.open({
         title: 'Edit Vision',
         name: entry.title,
         details: entry.details,
-        onSave: (name, details) => API.updateVision(id, { title: name, details }).then(load)
+        fields: { horizon: entry.time_horizon },
+        onSave: (values) => window.runAppAction(async () => {
+          await API.updateVision(id, { title: values.name, details: values.details, time_horizon: values.horizon });
+          await load();
+        }),
       });
-    } else if (action === 'delete') {
-      window.AppModal.confirmDelete(async () => {
-        const deleted = { ...entry };
+      return;
+    }
+
+    if (action === 'delete') {
+      window.AppModal.confirmDelete(() => window.runAppAction(async () => {
         await API.deleteVision(id);
-        load();
-        window.AppToast.show({
-          message: 'Vision entry deleted',
-          undoCallback: async () => {
-            await API.createVision({ title: deleted.title, details: deleted.details, time_horizon: deleted.time_horizon });
-            load();
-          }
-        });
-      });
+        await load();
+      }));
     }
   }
 
@@ -64,11 +61,12 @@ window.VisionTab = (() => {
     const select = document.getElementById('vision-horizon');
     const title = input.value.trim();
     if (!title) return;
+
     input.value = '';
     const time_horizon = select.value;
     select.value = '';
     await API.createVision({ title, time_horizon });
-    load();
+    await load();
   }
 
   async function load() {
@@ -78,9 +76,11 @@ window.VisionTab = (() => {
 
   function init() {
     document.getElementById('vision-list').addEventListener('click', handleClick);
-    document.getElementById('add-vision-btn').addEventListener('click', addVision);
-    document.getElementById('vision-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') addVision();
+    document.getElementById('add-vision-btn').addEventListener('click', () => window.runAppAction(() => addVision()));
+    document.getElementById('vision-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        window.runAppAction(() => addVision());
+      }
     });
   }
 

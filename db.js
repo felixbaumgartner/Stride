@@ -2,6 +2,15 @@ const { createClient } = require('@libsql/client');
 
 let client;
 
+async function ensureColumn(tableName, columnName, definition) {
+  const result = await client.execute(`PRAGMA table_info(${tableName})`);
+  const hasColumn = result.rows.some((row) => row.name === columnName);
+
+  if (!hasColumn) {
+    await client.execute(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
 async function initDb() {
   client = createClient({
     url: process.env.TURSO_DATABASE_URL,
@@ -18,6 +27,9 @@ async function initDb() {
       completed INTEGER DEFAULT 0,
       source TEXT DEFAULT 'manual',
       source_idea_id INTEGER,
+      principle_id INTEGER,
+      vision_id INTEGER,
+      focus INTEGER DEFAULT 0,
       position INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -30,6 +42,9 @@ async function initDb() {
       title TEXT NOT NULL,
       details TEXT DEFAULT '',
       converted INTEGER DEFAULT 0,
+      archived INTEGER DEFAULT 0,
+      principle_id INTEGER,
+      vision_id INTEGER,
       converted_task_id INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -59,8 +74,31 @@ async function initDb() {
     )
   `);
 
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS weekly_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      week TEXT NOT NULL UNIQUE,
+      wins TEXT DEFAULT '',
+      blockers TEXT DEFAULT '',
+      changes_summary TEXT DEFAULT '',
+      next_focus TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  await ensureColumn('tasks', 'principle_id', 'INTEGER');
+  await ensureColumn('tasks', 'vision_id', 'INTEGER');
+  await ensureColumn('tasks', 'focus', 'INTEGER DEFAULT 0');
+  await ensureColumn('ideas', 'archived', 'INTEGER DEFAULT 0');
+  await ensureColumn('ideas', 'principle_id', 'INTEGER');
+  await ensureColumn('ideas', 'vision_id', 'INTEGER');
+
   await client.execute('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_tasks_focus_date ON tasks(date, focus)');
   await client.execute('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_ideas_archived ON ideas(archived)');
+  await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_reviews_week ON weekly_reviews(week)');
 }
 
 async function dbAll(sql, params = []) {
@@ -79,7 +117,8 @@ async function dbRun(sql, params = []) {
 }
 
 async function dbTransaction(fn) {
-  return await client.transaction(async (tx) => {
+  const tx = await client.transaction('write');
+  try {
     const txAll = async (sql, params = []) => {
       const result = await tx.execute({ sql, args: params });
       return result.rows;
@@ -92,8 +131,13 @@ async function dbTransaction(fn) {
       const result = await tx.execute({ sql, args: params });
       return { lastInsertRowid: result.lastInsertRowid };
     };
-    return await fn({ dbAll: txAll, dbGet: txGet, dbRun: txRun });
-  });
+    const result = await fn({ dbAll: txAll, dbGet: txGet, dbRun: txRun });
+    await tx.commit();
+    return result;
+  } catch (e) {
+    await tx.rollback();
+    throw e;
+  }
 }
 
 module.exports = { initDb, dbAll, dbGet, dbRun, dbTransaction };

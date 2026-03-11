@@ -9,8 +9,6 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-
-  <!-- Intro / Unboxing Animation -->
   <div class="intro" id="intro">
     <div class="intro-logo">Stride</div>
     <div class="intro-tagline">Your work. Refined.</div>
@@ -39,62 +37,67 @@
     </nav>
 
     <main class="tab-content">
-      <!-- Daily Tasks Panel -->
       <section id="tasks-panel" class="panel active">
         <div class="date-nav">
-          <button class="date-btn" id="prev-day">
+          <button class="date-btn" id="prev-day" aria-label="Previous day">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <span class="date-display" id="current-date"></span>
-          <button class="date-btn" id="next-day">
+          <button class="date-btn" id="next-day" aria-label="Next day">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
           <button class="date-btn today-btn" id="today-btn">Today</button>
         </div>
+
+        <div id="carryover-banner" class="carryover-banner hidden"></div>
+        <div id="focus-summary" class="focus-summary"></div>
+
         <button class="summary-toggle" id="summary-toggle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-          Weekly Summary
+          Weekly Summary & Review
         </button>
         <div id="summary-view" class="summary-view hidden"></div>
         <div id="tasks-list" class="item-list"></div>
         <div class="add-bar">
           <input type="text" id="task-input" class="add-input" placeholder="What do you need to do?" />
-          <button class="add-btn" id="add-task-btn">
+          <button class="add-btn" id="add-task-btn" aria-label="Add task">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
       </section>
 
-      <!-- Work Ideas Panel -->
       <section id="ideas-panel" class="panel">
-        <div class="panel-header">
+        <div class="panel-header panel-header-inline">
           <label class="toggle-label">
             <input type="checkbox" id="show-converted" />
             <span class="toggle-switch"></span>
             Show converted
           </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="show-archived" />
+            <span class="toggle-switch"></span>
+            Show archived
+          </label>
         </div>
         <div id="ideas-list" class="item-list"></div>
         <div class="add-bar">
           <input type="text" id="idea-input" class="add-input" placeholder="What's on your mind?" />
-          <button class="add-btn" id="add-idea-btn">
+          <button class="add-btn" id="add-idea-btn" aria-label="Add idea">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
       </section>
 
-      <!-- Work Principles Panel -->
       <section id="principles-panel" class="panel">
         <div id="principles-list" class="item-list"></div>
         <div class="add-bar">
           <input type="text" id="principle-input" class="add-input" placeholder="What do you believe in?" />
-          <button class="add-btn" id="add-principle-btn">
+          <button class="add-btn" id="add-principle-btn" aria-label="Add principle">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
       </section>
 
-      <!-- Future Vision Panel -->
       <section id="vision-panel" class="panel">
         <div id="vision-list" class="item-list"></div>
         <div class="add-bar vision-add-bar">
@@ -108,7 +111,7 @@
             <option value="5 years">5 years</option>
             <option value="10 years">10 years</option>
           </select>
-          <button class="add-btn" id="add-vision-btn">
+          <button class="add-btn" id="add-vision-btn" aria-label="Add vision">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
@@ -116,12 +119,48 @@
     </main>
   </div>
 
-  <!-- Detail Modal -->
   <div class="modal-overlay hidden" id="detail-modal">
     <div class="modal">
       <h3 class="modal-title" id="modal-title">Edit Details</h3>
       <input type="text" class="modal-input" id="modal-name" placeholder="Title" />
       <textarea class="modal-textarea" id="modal-details" placeholder="Add details or notes..."></textarea>
+
+      <div class="modal-field hidden" id="modal-date-wrap">
+        <label class="modal-label" for="modal-date">When</label>
+        <input type="date" class="modal-input" id="modal-date" />
+      </div>
+
+      <div class="modal-field hidden" id="modal-horizon-wrap">
+        <label class="modal-label" for="modal-horizon">Time horizon</label>
+        <select class="modal-input modal-select" id="modal-horizon">
+          <option value="">No horizon</option>
+          <option value="3 months">3 months</option>
+          <option value="6 months">6 months</option>
+          <option value="1 year">1 year</option>
+          <option value="3 years">3 years</option>
+          <option value="5 years">5 years</option>
+          <option value="10 years">10 years</option>
+        </select>
+      </div>
+
+      <div class="modal-grid hidden" id="modal-links-wrap">
+        <div class="modal-field">
+          <label class="modal-label" for="modal-principle">Principle</label>
+          <select class="modal-input modal-select" id="modal-principle"></select>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="modal-vision">Vision</label>
+          <select class="modal-input modal-select" id="modal-vision"></select>
+        </div>
+      </div>
+
+      <label class="modal-check hidden" id="modal-focus-wrap">
+        <input type="checkbox" id="modal-focus" />
+        Mark as one of today&apos;s focus tasks
+      </label>
+
+      <div class="modal-extra-actions hidden" id="modal-extra-actions"></div>
+
       <div class="modal-actions">
         <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
         <button class="btn" id="modal-save">Save</button>
@@ -129,11 +168,10 @@
     </div>
   </div>
 
-  <!-- Delete Confirmation Modal -->
   <div class="modal-overlay hidden" id="delete-modal">
     <div class="modal modal-small">
       <p class="delete-msg">Are you sure you want to delete this?</p>
-      <p class="delete-submsg">You'll have a few seconds to undo this.</p>
+      <p class="delete-submsg">This action can't be undone.</p>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="delete-cancel">Cancel</button>
         <button class="btn btn-danger" id="delete-confirm">Delete</button>
@@ -141,9 +179,7 @@
     </div>
   </div>
 
-  <!-- Toast Notifications -->
-  <div id="toast-container" class="toast-container"></div>
-
+  <script src="/js/utils.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/tasks.js"></script>
   <script src="/js/ideas.js"></script>

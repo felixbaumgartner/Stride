@@ -1,20 +1,64 @@
 window.TasksTab = (() => {
-  let currentDate = new Date().toISOString().split('T')[0];
+  let currentDate = window.DateUtils.today();
   let tasks = [];
+  let carryoverTasks = [];
+  let principles = [];
+  let vision = [];
 
-  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   function formatDate(dateStr) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return `${MONTHS[m - 1]} ${d}, ${y}`;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return `${MONTHS[month - 1]} ${day}, ${year}`;
   }
 
-  function shiftDate(offset) {
-    const d = new Date(currentDate + 'T12:00:00');
-    d.setDate(d.getDate() + offset);
-    currentDate = d.toISOString().split('T')[0];
-    load();
+  async function ensureLookups() {
+    [principles, vision] = await Promise.all([API.getPrinciples(), API.getVision()]);
+  }
+
+  function renderFocusSummary() {
+    const focusCount = tasks.filter((task) => task.focus).length;
+    const completedFocusCount = tasks.filter((task) => task.focus && task.completed).length;
+    const summary = document.getElementById('focus-summary');
+
+    summary.innerHTML = `
+      <div class="focus-summary-card">
+        <div>
+          <div class="focus-summary-title">Daily focus</div>
+          <div class="focus-summary-copy">${focusCount}/3 focus slots used${focusCount ? `, ${completedFocusCount} completed` : ''}</div>
+        </div>
+        <div class="focus-summary-value">${focusCount}</div>
+      </div>
+    `;
+  }
+
+  function renderCarryover() {
+    const banner = document.getElementById('carryover-banner');
+
+    if (!carryoverTasks.length) {
+      banner.classList.add('hidden');
+      banner.innerHTML = '';
+      return;
+    }
+
+    banner.classList.remove('hidden');
+    banner.innerHTML = `
+      <div class="carryover-header">
+        <div>
+          <div class="carryover-title">Unfinished from ${formatDate(window.DateUtils.shift(currentDate, -1))}</div>
+          <div class="carryover-copy">Move what still matters into ${formatDate(currentDate)}.</div>
+        </div>
+        <button class="ghost-btn" data-action="carryover-all">Move all here</button>
+      </div>
+      <div class="carryover-list">
+        ${carryoverTasks.map((task) => `
+          <button class="carryover-chip" data-action="carryover-one" data-id="${task.id}">
+            <span>${escapeHtml(task.title)}</span>
+            <span>Move</span>
+          </button>
+        `).join('')}
+      </div>
+    `;
   }
 
   function renderTasks() {
@@ -25,56 +69,138 @@ window.TasksTab = (() => {
       return;
     }
 
-    list.innerHTML = tasks.map(t => `
-      <div class="item-card" data-id="${t.id}">
-        <div class="item-main">
-          <div class="task-checkbox ${t.completed ? 'checked' : ''}" data-action="toggle"></div>
-          <span class="item-title ${t.completed ? 'completed' : ''}" data-action="expand">${escapeHtml(t.title)}</span>
-          ${t.source === 'idea' ? '<span class="item-badge">from idea</span>' : ''}
-          <div class="item-actions">
-            <button class="action-btn" data-action="edit" title="Edit">&#9998;</button>
-            <button class="action-btn delete-btn" data-action="delete" title="Delete">&#10005;</button>
+    list.innerHTML = tasks.map((task) => {
+      const meta = [];
+      if (task.principle_text) meta.push(`<span class="meta-chip">Principle: ${escapeHtml(task.principle_text)}</span>`);
+      if (task.vision_title) meta.push(`<span class="meta-chip">Vision: ${escapeHtml(task.vision_title)}</span>`);
+
+      return `
+        <div class="item-card ${task.focus ? 'focused' : ''}" data-id="${task.id}">
+          <div class="item-main">
+            <div class="task-checkbox ${task.completed ? 'checked' : ''}" data-action="toggle"></div>
+            <span class="item-title ${task.completed ? 'completed' : ''}" data-action="expand">${escapeHtml(task.title)}</span>
+            ${task.focus ? '<span class="item-badge item-badge-focus">Focus</span>' : ''}
+            ${task.source === 'idea' ? '<span class="item-badge">from idea</span>' : ''}
+            <div class="item-actions">
+              <button class="action-btn" data-action="focus" title="Toggle focus">${task.focus ? '&#9733;' : '&#9734;'}</button>
+              <button class="action-btn" data-action="edit" title="Edit">&#9998;</button>
+              <button class="action-btn delete-btn" data-action="delete" title="Delete">&#10005;</button>
+            </div>
           </div>
+          ${(task.details || meta.length) ? `
+            <div class="item-details visible" data-action="expand-target">
+              ${task.details ? `<div>${escapeHtml(task.details)}</div>` : ''}
+              ${meta.length ? `<div class="item-meta">${meta.join('')}</div>` : ''}
+            </div>
+          ` : ''}
         </div>
-        <div class="item-details ${t.details ? 'visible' : ''}" data-action="expand-target">${escapeHtml(t.details)}</div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
-  function handleClick(e) {
-    const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
+  function openTaskEditor(task) {
+    window.AppModal.open({
+      title: 'Edit Task',
+      name: task.title,
+      details: task.details,
+      fields: {
+        date: task.date,
+        principleId: task.principle_id,
+        visionId: task.vision_id,
+        focus: task.focus,
+      },
+      options: { principles, vision },
+      extraActions: [
+        {
+          label: 'Move to tomorrow',
+          onClick: () => window.runAppAction(async () => {
+            await API.rescheduleTask(task.id, window.DateUtils.shift(task.date, 1));
+            await load();
+          }),
+        },
+        {
+          label: 'Move to next week',
+          onClick: () => window.runAppAction(async () => {
+            await API.rescheduleTask(task.id, window.DateUtils.shift(task.date, 7));
+            await load();
+          }),
+        },
+      ],
+      onSave: (values) => window.runAppAction(async () => {
+        await API.updateTask(task.id, {
+          title: values.name,
+          details: values.details,
+          date: values.date,
+          principle_id: values.principleId,
+          vision_id: values.visionId,
+          focus: values.focus,
+        });
+        await load();
+      }),
+    });
+  }
+
+  function handleClick(event) {
+    const action = event.target.dataset.action || event.target.closest('[data-action]')?.dataset.action;
     if (!action) return;
 
-    const card = e.target.closest('.item-card');
+    const card = event.target.closest('.item-card');
     if (!card) return;
     const id = Number(card.dataset.id);
-    const task = tasks.find(t => t.id === id);
+    const task = tasks.find((item) => item.id === id);
     if (!task) return;
 
     if (action === 'toggle') {
-      API.toggleTask(id, task.completed ? 0 : 1).then(load);
-    } else if (action === 'expand') {
-      const details = card.querySelector('.item-details');
-      details.classList.toggle('visible');
-    } else if (action === 'edit') {
-      window.AppModal.open({
-        title: 'Edit Task',
-        name: task.title,
-        details: task.details,
-        onSave: (name, details) => API.updateTask(id, { title: name, details }).then(load)
+      window.runAppAction(async () => {
+        await API.toggleTask(id, task.completed ? 0 : 1);
+        await load();
       });
-    } else if (action === 'delete') {
-      window.AppModal.confirmDelete(async () => {
-        const deleted = { ...task };
+      return;
+    }
+
+    if (action === 'focus') {
+      window.runAppAction(async () => {
+        await API.setTaskFocus(id, task.focus ? 0 : 1);
+        await load();
+      });
+      return;
+    }
+
+    if (action === 'edit') {
+      openTaskEditor(task);
+      return;
+    }
+
+    if (action === 'delete') {
+      window.AppModal.confirmDelete(() => window.runAppAction(async () => {
         await API.deleteTask(id);
-        load();
-        window.AppToast.show({
-          message: 'Task deleted',
-          undoCallback: async () => {
-            await API.createTask({ title: deleted.title, details: deleted.details, date: deleted.date });
-            load();
-          }
-        });
+        await load();
+      }));
+    }
+  }
+
+  function handleCarryoverClick(event) {
+    const action = event.target.dataset.action || event.target.closest('[data-action]')?.dataset.action;
+    if (!action) return;
+
+    if (action === 'carryover-all') {
+      window.runAppAction(async () => {
+        for (const task of carryoverTasks) {
+          await API.rescheduleTask(task.id, currentDate);
+        }
+        await load();
+      });
+      return;
+    }
+
+    if (action === 'carryover-one') {
+      const trigger = event.target.closest('[data-id]');
+      const id = Number(trigger?.dataset.id);
+      if (!id) return;
+
+      window.runAppAction(async () => {
+        await API.rescheduleTask(id, currentDate);
+        await load();
       });
     }
   }
@@ -83,19 +209,23 @@ window.TasksTab = (() => {
     const input = document.getElementById('task-input');
     const title = input.value.trim();
     if (!title) return;
+
     input.value = '';
     await API.createTask({ title, date: currentDate });
-    load();
+    await load();
   }
 
-  async function loadSummary() {
+  async function renderSummary() {
     const view = document.getElementById('summary-view');
-    if (!view.classList.contains('hidden')) {
-      view.classList.add('hidden');
-      return;
-    }
-    const data = await API.getSummary();
+    const data = await API.getSummary({ date: currentDate });
+
     view.innerHTML = `
+      <div class="summary-header">
+        <div>
+          <div class="summary-kicker">Week ${escapeHtml(data.week)}</div>
+          <h3 class="summary-heading">Review for the week of ${escapeHtml(formatDate(data.dateRange.from))}</h3>
+        </div>
+      </div>
       <div class="summary-stats">
         <div class="summary-stat">
           <div class="summary-stat-value">${data.totalTasks}</div>
@@ -106,56 +236,139 @@ window.TasksTab = (() => {
           <div class="summary-stat-label">Completed</div>
         </div>
         <div class="summary-stat">
-          <div class="summary-stat-value">${data.completionRate}%</div>
-          <div class="summary-stat-label">Rate</div>
+          <div class="summary-stat-value">${data.focusedCompletedTasks}/${data.focusedTasks}</div>
+          <div class="summary-stat-label">Focus Done</div>
         </div>
         <div class="summary-stat">
-          <div class="summary-stat-value">${data.ideasCreated}</div>
-          <div class="summary-stat-label">Ideas</div>
+          <div class="summary-stat-value">${data.ideasConverted}</div>
+          <div class="summary-stat-label">Ideas Used</div>
         </div>
       </div>
-      ${data.dailyBreakdown.map(day => `
+      ${data.dailyBreakdown.map((day) => `
         <div class="summary-day">
           <div class="summary-day-header">
-            <span class="summary-day-name">${day.day}</span>
-            <span class="summary-day-count">${day.completedCount}/${day.tasks.length} done</span>
+            <span class="summary-day-name">${escapeHtml(day.day)}</span>
+            <span class="summary-day-count">${day.completedCount}/${day.tasks.length} done${day.focusCount ? ` � ${day.focusCount} focus` : ''}</span>
           </div>
-          ${day.tasks.length ? `<ul class="summary-day-tasks">${day.tasks.filter(t => t.completed).map(t => `<li>${escapeHtml(t.title)}</li>`).join('')}</ul>` : ''}
+          ${day.tasks.length ? `
+            <ul class="summary-day-tasks">
+              ${day.tasks.map((task) => `<li>${task.completed ? '&#10003; ' : ''}${escapeHtml(task.title)}</li>`).join('')}
+            </ul>
+          ` : '<div class="summary-day-empty">No tasks logged.</div>'}
         </div>
       `).join('')}
-      <button class="summary-close" id="summary-close">Close</button>
+      <div class="weekly-review">
+        <div class="weekly-review-header">
+          <h4>Weekly review</h4>
+          <p>Capture what worked, what blocked you, and what deserves next week&apos;s attention.</p>
+        </div>
+        <label class="review-field">
+          <span>Wins</span>
+          <textarea id="review-wins" class="modal-textarea review-textarea" placeholder="What moved forward this week?">${escapeHtml(data.review.wins)}</textarea>
+        </label>
+        <label class="review-field">
+          <span>Blockers</span>
+          <textarea id="review-blockers" class="modal-textarea review-textarea" placeholder="What slowed you down?">${escapeHtml(data.review.blockers)}</textarea>
+        </label>
+        <label class="review-field">
+          <span>What changed</span>
+          <textarea id="review-changes" class="modal-textarea review-textarea" placeholder="What did you learn or adjust?">${escapeHtml(data.review.changesSummary)}</textarea>
+        </label>
+        <label class="review-field">
+          <span>Next week focus</span>
+          <textarea id="review-next-focus" class="modal-textarea review-textarea" placeholder="What should matter next week?">${escapeHtml(data.review.nextFocus)}</textarea>
+        </label>
+        <div class="weekly-review-actions">
+          <button class="btn" id="save-weekly-review" data-week="${escapeHtml(data.week)}">Save weekly review</button>
+          <button class="summary-close" id="summary-close">Close</button>
+        </div>
+      </div>
     `;
+
     view.classList.remove('hidden');
-    document.getElementById('summary-close').addEventListener('click', () => view.classList.add('hidden'));
+  }
+
+  async function loadSummary() {
+    const view = document.getElementById('summary-view');
+    if (!view.classList.contains('hidden')) {
+      view.classList.add('hidden');
+      return;
+    }
+
+    await renderSummary();
   }
 
   async function load() {
     document.getElementById('current-date').textContent = formatDate(currentDate);
-    tasks = await API.getTasks(currentDate);
+    await ensureLookups();
+
+    const previousDate = window.DateUtils.shift(currentDate, -1);
+    const [currentTasks, previousTasks] = await Promise.all([
+      API.getTasks(currentDate),
+      API.getTasks(previousDate),
+    ]);
+
+    tasks = currentTasks;
+    carryoverTasks = previousTasks.filter((task) => !task.completed);
+
+    renderCarryover();
+    renderFocusSummary();
     renderTasks();
+
+    const summaryView = document.getElementById('summary-view');
+    if (!summaryView.classList.contains('hidden')) {
+      await renderSummary();
+    }
   }
 
   function init() {
-    document.getElementById('prev-day').addEventListener('click', () => shiftDate(-1));
-    document.getElementById('next-day').addEventListener('click', () => shiftDate(1));
+    document.getElementById('prev-day').addEventListener('click', () => {
+      currentDate = window.DateUtils.shift(currentDate, -1);
+      window.runAppAction(() => load());
+    });
+
+    document.getElementById('next-day').addEventListener('click', () => {
+      currentDate = window.DateUtils.shift(currentDate, 1);
+      window.runAppAction(() => load());
+    });
+
     document.getElementById('today-btn').addEventListener('click', () => {
-      currentDate = new Date().toISOString().split('T')[0];
-      load();
+      currentDate = window.DateUtils.today();
+      window.runAppAction(() => load());
     });
+
     document.getElementById('tasks-list').addEventListener('click', handleClick);
-    document.getElementById('add-task-btn').addEventListener('click', addTask);
-    document.getElementById('task-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') addTask();
+    document.getElementById('carryover-banner').addEventListener('click', handleCarryoverClick);
+    document.getElementById('add-task-btn').addEventListener('click', () => window.runAppAction(() => addTask()));
+    document.getElementById('task-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        window.runAppAction(() => addTask());
+      }
     });
-    document.getElementById('summary-toggle').addEventListener('click', loadSummary);
+
+    document.getElementById('summary-toggle').addEventListener('click', () => window.runAppAction(() => loadSummary()));
+    document.getElementById('summary-view').addEventListener('click', (event) => {
+      if (event.target.id === 'summary-close') {
+        document.getElementById('summary-view').classList.add('hidden');
+        return;
+      }
+
+      if (event.target.id === 'save-weekly-review') {
+        const week = event.target.dataset.week;
+        window.runAppAction(async () => {
+          await API.saveWeeklyReview({
+            week,
+            wins: document.getElementById('review-wins').value.trim(),
+            blockers: document.getElementById('review-blockers').value.trim(),
+            changesSummary: document.getElementById('review-changes').value.trim(),
+            nextFocus: document.getElementById('review-next-focus').value.trim(),
+          });
+          await renderSummary();
+        });
+      }
+    });
   }
 
   return { init, load };
 })();
 
-function escapeHtml(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}

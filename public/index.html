@@ -52,10 +52,17 @@
         <div id="carryover-banner" class="carryover-banner hidden"></div>
         <div id="focus-summary" class="focus-summary"></div>
 
-        <button class="summary-toggle" id="summary-toggle">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-          Weekly Summary & Review
-        </button>
+        <div class="toggle-row">
+          <button class="summary-toggle" id="summary-toggle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            Weekly Summary & Review
+          </button>
+          <button class="summary-toggle" id="unfinished-toggle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Unfinished Tasks
+          </button>
+        </div>
+        <div id="unfinished-view" class="summary-view hidden"></div>
         <div id="summary-view" class="summary-view hidden"></div>
         <div id="tasks-list" class="item-list"></div>
         <div class="add-bar">

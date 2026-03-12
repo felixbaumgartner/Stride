@@ -288,6 +288,95 @@ window.TasksTab = (() => {
     view.classList.remove('hidden');
   }
 
+  function filterByDaysAgo(tasks, days) {
+    const today = new Date(window.DateUtils.today() + 'T00:00:00');
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    return tasks.filter((t) => t.date >= cutoffStr);
+  }
+
+  function renderUnfinishedSection(label, items) {
+    if (!items.length) {
+      return `
+        <div class="unfinished-section">
+          <div class="unfinished-section-header">
+            <span class="unfinished-section-label">${label}</span>
+            <span class="unfinished-section-count">0 tasks</span>
+          </div>
+          <div class="summary-day-empty">No unfinished tasks.</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="unfinished-section">
+        <div class="unfinished-section-header">
+          <span class="unfinished-section-label">${label}</span>
+          <span class="unfinished-section-count">${items.length} task${items.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="unfinished-task-list">
+          ${items.map((t) => `
+            <div class="unfinished-task-item">
+              <span class="unfinished-task-title">${escapeHtml(t.title)}</span>
+              <span class="unfinished-task-date">${formatDate(t.date)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  async function renderUnfinished() {
+    const view = document.getElementById('unfinished-view');
+    const allTasks = await API.getUnfinishedTasks();
+
+    const oneWeek = filterByDaysAgo(allTasks, 7);
+    const twoWeeks = filterByDaysAgo(allTasks, 14);
+    const oneMonth = allTasks;
+
+    view.innerHTML = `
+      <div class="unfinished-header">
+        <div>
+          <div class="summary-kicker">Overdue</div>
+          <h3 class="summary-heading">Unfinished tasks</h3>
+        </div>
+      </div>
+      <div class="unfinished-stats">
+        <div class="summary-stat">
+          <div class="summary-stat-value">${oneWeek.length}</div>
+          <div class="summary-stat-label">7 Days</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-value">${twoWeeks.length}</div>
+          <div class="summary-stat-label">14 Days</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-value">${oneMonth.length}</div>
+          <div class="summary-stat-label">30 Days</div>
+        </div>
+      </div>
+      ${renderUnfinishedSection('Last 7 days', oneWeek)}
+      ${renderUnfinishedSection('Last 14 days', twoWeeks)}
+      ${renderUnfinishedSection('Last 30 days', oneMonth)}
+      <div class="weekly-review-actions">
+        <button class="summary-close" id="unfinished-close">Close</button>
+      </div>
+    `;
+
+    view.classList.remove('hidden');
+  }
+
+  async function loadUnfinished() {
+    const view = document.getElementById('unfinished-view');
+    if (!view.classList.contains('hidden')) {
+      view.classList.add('hidden');
+      return;
+    }
+
+    await renderUnfinished();
+  }
+
   async function loadSummary() {
     const view = document.getElementById('summary-view');
     if (!view.classList.contains('hidden')) {
@@ -347,6 +436,12 @@ window.TasksTab = (() => {
     });
 
     document.getElementById('summary-toggle').addEventListener('click', () => window.runAppAction(() => loadSummary()));
+    document.getElementById('unfinished-toggle').addEventListener('click', () => window.runAppAction(() => loadUnfinished()));
+    document.getElementById('unfinished-view').addEventListener('click', (event) => {
+      if (event.target.id === 'unfinished-close') {
+        document.getElementById('unfinished-view').classList.add('hidden');
+      }
+    });
     document.getElementById('summary-view').addEventListener('click', (event) => {
       if (event.target.id === 'summary-close') {
         document.getElementById('summary-view').classList.add('hidden');

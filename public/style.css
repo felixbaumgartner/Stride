@@ -458,14 +458,19 @@ body {
 }
 
 /* ========== SUMMARY ========== */
+.toggle-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
 .summary-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
   padding: 12px;
-  margin-bottom: 24px;
   background: var(--surface);
   border: 1px solid var(--separator-strong);
   color: var(--text-secondary);
@@ -1483,6 +1488,87 @@ body {
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 20px;
+}
+
+/* ========== UNFINISHED TASKS ========== */
+.unfinished-header {
+  margin-bottom: 20px;
+}
+
+.unfinished-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.unfinished-section {
+  padding: 14px 0;
+  border-top: 1px solid var(--separator);
+}
+
+.unfinished-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.unfinished-section-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.unfinished-section-count {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.unfinished-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.unfinished-task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-xs);
+}
+
+.unfinished-task-title {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.unfinished-task-date {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .toggle-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .unfinished-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 480px) {

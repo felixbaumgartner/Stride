@@ -79,6 +79,20 @@ async function getTaskById(id) {
   return dbGet(`${TASK_SELECT} WHERE t.id = ?`, [id]);
 }
 
+// Get unfinished tasks from the last 30 days (covers 1w, 2w, 1m views)
+router.get('/unfinished', asyncHandler(async (req, res) => {
+  const today = getTodayDate();
+  const d = new Date(today + 'T00:00:00');
+  d.setDate(d.getDate() - 30);
+  const fromDate = d.toISOString().split('T')[0];
+
+  const tasks = await dbAll(
+    `${TASK_SELECT} WHERE t.completed = 0 AND t.date >= ? AND t.date <= ? ORDER BY t.date DESC, t.focus DESC, t.position ASC`,
+    [fromDate, today]
+  );
+  res.json(tasks);
+}));
+
 // List tasks, optionally filtered by date range
 router.get('/', asyncHandler(async (req, res) => {
   const { from, to } = req.query;

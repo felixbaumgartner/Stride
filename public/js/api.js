@@ -18,6 +18,9 @@ window.API = (() => {
     getTasks(date) {
       return request(`/api/tasks?from=${encodeURIComponent(date)}`);
     },
+    getUnfinishedTasks() {
+      return request('/api/tasks/unfinished');
+    },
     createTask(body) {
       return request('/api/tasks', { method: 'POST', body });
     },

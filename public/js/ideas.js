@@ -21,12 +21,14 @@ window.IdeasTab = (() => {
       if (idea.vision_title) meta.push(`<span class="meta-chip">Vision: ${escapeHtml(idea.vision_title)}</span>`);
 
       return `
-        <div class="item-card ${idea.converted ? 'converted' : ''} ${idea.archived ? 'archived' : ''}" data-id="${idea.id}">
+        <div class="item-card ${idea.starred ? 'starred' : ''} ${idea.converted ? 'converted' : ''} ${idea.archived ? 'archived' : ''}" data-id="${idea.id}">
           <div class="item-main">
             <span class="item-title">${escapeHtml(idea.title)}</span>
+            ${idea.starred ? '<span class="item-badge item-badge-starred">Starred</span>' : ''}
             ${idea.converted ? '<span class="item-badge">Converted</span>' : ''}
             ${idea.archived ? '<span class="item-badge item-badge-archived">Archived</span>' : ''}
             <div class="item-actions">
+              <button class="action-btn" data-action="star" title="Toggle star">${idea.starred ? '&#9733;' : '&#9734;'}</button>
               ${!idea.converted ? '<button class="action-btn convert-btn" data-action="convert" title="Convert to task">&#10132;</button>' : ''}
               <button class="action-btn" data-action="archive" title="Archive">${idea.archived ? '&#8634;' : '&#128230;'}</button>
               <button class="action-btn" data-action="edit" title="Edit">&#9998;</button>
@@ -75,6 +77,14 @@ window.IdeasTab = (() => {
     const id = Number(card.dataset.id);
     const idea = ideas.find((item) => item.id === id);
     if (!idea) return;
+
+    if (action === 'star') {
+      window.runAppAction(async () => {
+        await API.starIdea(id, idea.starred ? 0 : 1);
+        await load();
+      });
+      return;
+    }
 
     if (action === 'edit') {
       openIdeaEditor(idea);

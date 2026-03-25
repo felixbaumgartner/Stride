@@ -7,11 +7,11 @@ const asyncHandler = (fn) => (req, res, next) =>
 
 router.get('/', asyncHandler(async (req, res) => {
   const q = (req.query.q || '').trim();
-  if (!q) return res.json({ tasks: [], ideas: [], principles: [], vision: [] });
+  if (!q) return res.json({ tasks: [], ideas: [], principles: [], vision: [], docs: [] });
 
   const pattern = `%${q}%`;
 
-  const [tasks, ideas, principles, vision] = await Promise.all([
+  const [tasks, ideas, principles, vision, docs] = await Promise.all([
     dbAll(
       'SELECT * FROM tasks WHERE title LIKE ? OR details LIKE ? ORDER BY date DESC, position ASC LIMIT 20',
       [pattern, pattern]
@@ -27,10 +27,14 @@ router.get('/', asyncHandler(async (req, res) => {
     dbAll(
       'SELECT * FROM vision WHERE title LIKE ? OR details LIKE ? ORDER BY position ASC LIMIT 20',
       [pattern, pattern]
+    ),
+    dbAll(
+      'SELECT * FROM docs WHERE title LIKE ? OR content LIKE ? ORDER BY date DESC LIMIT 20',
+      [pattern, pattern]
     )
   ]);
 
-  res.json({ tasks, ideas, principles, vision });
+  res.json({ tasks, ideas, principles, vision, docs });
 }));
 
 module.exports = router;

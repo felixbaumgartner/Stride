@@ -8,6 +8,7 @@ const principlesRouter = require('./routes/principles');
 const visionRouter = require('./routes/vision');
 const summaryRouter = require('./routes/summary');
 const exportRouter = require('./routes/export');
+const docsRouter = require('./routes/docs');
 const searchRouter = require('./routes/search');
 
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/ideas', ideasRouter);
 app.use('/api/principles', principlesRouter);
 app.use('/api/vision', visionRouter);
+app.use('/api/docs', docsRouter);
 app.use('/api/summary', summaryRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/search', searchRouter);

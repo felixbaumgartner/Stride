@@ -1323,11 +1323,13 @@ body {
   font-weight: 800;
 }
 
-.item-card.focused {
+.item-card.focused,
+.item-card.starred {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.item-badge-focus {
+.item-badge-focus,
+.item-badge-starred {
   background: rgba(255, 193, 7, 0.16);
   color: #9a6700;
 }
@@ -1335,6 +1337,10 @@ body {
 .item-badge-archived {
   background: rgba(29, 29, 31, 0.08);
   color: var(--text-secondary);
+}
+
+.doc-content {
+  white-space: pre-wrap;
 }
 
 .item-meta {

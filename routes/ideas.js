@@ -79,7 +79,7 @@ router.get('/', asyncHandler(async (req, res) => {
     sql += ` WHERE ${conditions.join(' AND ')}`;
   }
 
-  sql += ' ORDER BY i.archived ASC, i.converted ASC, i.created_at DESC';
+  sql += ' ORDER BY i.archived ASC, i.converted ASC, i.starred DESC, i.created_at DESC';
   res.json(await dbAll(sql));
 }));
 
@@ -146,6 +146,20 @@ router.patch('/:id/archive', asyncHandler(async (req, res) => {
   const now = new Date().toISOString();
 
   await dbRun('UPDATE ideas SET archived = ?, updated_at = ? WHERE id = ?', [archived, now, req.params.id]);
+
+  const idea = await getIdeaById(req.params.id);
+  res.json(idea);
+}));
+
+// Star or unstar idea
+router.patch('/:id/star', asyncHandler(async (req, res) => {
+  const existing = await dbGet('SELECT * FROM ideas WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Idea not found' });
+
+  const starred = normalizeFlag(req.body.starred, existing.starred ? 0 : 1);
+  const now = new Date().toISOString();
+
+  await dbRun('UPDATE ideas SET starred = ?, updated_at = ? WHERE id = ?', [starred, now, req.params.id]);
 
   const idea = await getIdeaById(req.params.id);
   res.json(idea);

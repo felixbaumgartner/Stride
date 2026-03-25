@@ -56,11 +56,28 @@ window.API = (() => {
     archiveIdea(id, archived) {
       return request(`/api/ideas/${id}/archive`, { method: 'PATCH', body: { archived } });
     },
+    starIdea(id, starred) {
+      return request(`/api/ideas/${id}/star`, { method: 'PATCH', body: { starred } });
+    },
     deleteIdea(id) {
       return request(`/api/ideas/${id}`, { method: 'DELETE' });
     },
     convertIdea(id, date) {
       return request(`/api/ideas/${id}/convert`, { method: 'POST', body: { date } });
+    },
+
+    getDocs(date) {
+      const params = date ? `?date=${encodeURIComponent(date)}` : '';
+      return request(`/api/docs${params}`);
+    },
+    createDoc(body) {
+      return request('/api/docs', { method: 'POST', body });
+    },
+    updateDoc(id, body) {
+      return request(`/api/docs/${id}`, { method: 'PUT', body });
+    },
+    deleteDoc(id) {
+      return request(`/api/docs/${id}`, { method: 'DELETE' });
     },
 
     getPrinciples() {

@@ -6,7 +6,7 @@ const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const [tasks, ideas, principles, vision, reviews] = await Promise.all([
+  const [tasks, ideas, principles, vision, reviews, docs] = await Promise.all([
     dbAll(`SELECT t.*, p.text AS principle_text, v.title AS vision_title
            FROM tasks t
            LEFT JOIN principles p ON p.id = t.principle_id
@@ -20,6 +20,7 @@ router.get('/', asyncHandler(async (req, res) => {
     dbAll('SELECT * FROM principles ORDER BY position ASC'),
     dbAll('SELECT * FROM vision ORDER BY position ASC'),
     dbAll('SELECT * FROM weekly_reviews ORDER BY week DESC'),
+    dbAll('SELECT * FROM docs ORDER BY date DESC, created_at ASC'),
   ]);
 
   let md = `# Stride Export\nGenerated: ${new Date().toISOString().split('T')[0]}\n\n`;
@@ -73,6 +74,16 @@ router.get('/', asyncHandler(async (req, res) => {
     if (v.time_horizon) md += `- Horizon: ${v.time_horizon}\n`;
     if (v.details) md += `- Details: ${v.details}\n`;
     md += '\n';
+  }
+
+  // Docs
+  if (docs.length) {
+    md += '## Docs\n\n';
+    for (const doc of docs) {
+      md += `### [${doc.date}] ${doc.title}\n`;
+      if (doc.content) md += `${doc.content}\n`;
+      md += '\n';
+    }
   }
 
   // Weekly Reviews

@@ -85,6 +85,17 @@ async function initDb() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS docs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT DEFAULT '',
+      date TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS weekly_reviews (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       week TEXT NOT NULL UNIQUE,
@@ -103,12 +114,14 @@ async function initDb() {
   await ensureColumn('ideas', 'archived', 'INTEGER DEFAULT 0');
   await ensureColumn('ideas', 'principle_id', 'INTEGER');
   await ensureColumn('ideas', 'vision_id', 'INTEGER');
+  await ensureColumn('ideas', 'starred', 'INTEGER DEFAULT 0');
 
   await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_focus_date ON tasks(date, focus)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_ideas_archived ON ideas(archived)');
   await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_reviews_week ON weekly_reviews(week)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_docs_date ON docs(date)');
 
   initialized = true;
 }

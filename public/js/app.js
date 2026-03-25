@@ -165,6 +165,7 @@ const tabs = {
   ideas: { panel: document.getElementById('ideas-panel'), module: window.IdeasTab },
   principles: { panel: document.getElementById('principles-panel'), module: window.PrinciplesTab },
   vision: { panel: document.getElementById('vision-panel'), module: window.VisionTab },
+  docs: { panel: document.getElementById('docs-panel'), module: window.DocsTab },
 };
 
 function switchTab(tabName) {
@@ -203,12 +204,12 @@ window.runAppAction(() => tabs.tasks.module.load());
   }
 
   function badgeLabel(type) {
-    return { tasks: 'Task', ideas: 'Idea', principles: 'Principle', vision: 'Vision' }[type] || type;
+    return { tasks: 'Task', ideas: 'Idea', principles: 'Principle', vision: 'Vision', docs: 'Doc' }[type] || type;
   }
 
   function renderResults(data) {
     const sections = [];
-    for (const type of ['tasks', 'ideas', 'principles', 'vision']) {
+    for (const type of ['tasks', 'ideas', 'principles', 'vision', 'docs']) {
       const items = data[type];
       if (!items || items.length === 0) continue;
       const rows = items.map((item) => {

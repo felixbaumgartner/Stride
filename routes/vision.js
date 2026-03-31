@@ -7,7 +7,7 @@ const asyncHandler = (fn) => (req, res, next) =>
 
 // List all vision entries
 router.get('/', asyncHandler(async (req, res) => {
-  res.json(await dbAll('SELECT * FROM vision ORDER BY position ASC, created_at ASC'));
+  res.json(await dbAll('SELECT * FROM vision WHERE user_id = ? ORDER BY position ASC, created_at ASC', [req.userId]));
 }));
 
 // Create vision entry
@@ -16,41 +16,41 @@ router.post('/', asyncHandler(async (req, res) => {
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   const now = new Date().toISOString();
-  const maxPos = await dbGet('SELECT COALESCE(MAX(position), -1) as max FROM vision');
+  const maxPos = await dbGet('SELECT COALESCE(MAX(position), -1) as max FROM vision WHERE user_id = ?', [req.userId]);
   const position = (maxPos?.max ?? -1) + 1;
 
   const result = await dbRun(
-    'INSERT INTO vision (title, details, time_horizon, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [title, details, time_horizon, position, now, now]
+    'INSERT INTO vision (title, details, time_horizon, position, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [title, details, time_horizon, position, req.userId, now, now]
   );
 
-  const entry = await dbGet('SELECT * FROM vision WHERE id = ?', [result.lastInsertRowid]);
+  const entry = await dbGet('SELECT * FROM vision WHERE id = ? AND user_id = ?', [result.lastInsertRowid, req.userId]);
   res.status(201).json(entry);
 }));
 
 // Update vision entry
 router.put('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM vision WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM vision WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Vision entry not found' });
 
   const { title, details, time_horizon } = req.body;
   const now = new Date().toISOString();
 
   await dbRun(
-    'UPDATE vision SET title = ?, details = ?, time_horizon = ?, updated_at = ? WHERE id = ?',
-    [title ?? existing.title, details ?? existing.details, time_horizon ?? existing.time_horizon, now, req.params.id]
+    'UPDATE vision SET title = ?, details = ?, time_horizon = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+    [title ?? existing.title, details ?? existing.details, time_horizon ?? existing.time_horizon, now, req.params.id, req.userId]
   );
 
-  const entry = await dbGet('SELECT * FROM vision WHERE id = ?', [req.params.id]);
+  const entry = await dbGet('SELECT * FROM vision WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   res.json(entry);
 }));
 
 // Delete vision entry
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM vision WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM vision WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Vision entry not found' });
 
-  await dbRun('DELETE FROM vision WHERE id = ?', [req.params.id]);
+  await dbRun('DELETE FROM vision WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   res.json({ success: true });
 }));
 

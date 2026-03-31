@@ -11,16 +11,18 @@ router.get('/', asyncHandler(async (req, res) => {
            FROM tasks t
            LEFT JOIN principles p ON p.id = t.principle_id
            LEFT JOIN vision v ON v.id = t.vision_id
-           ORDER BY date DESC, focus DESC, position ASC`),
+           WHERE t.user_id = ?
+           ORDER BY date DESC, focus DESC, position ASC`, [req.userId]),
     dbAll(`SELECT i.*, p.text AS principle_text, v.title AS vision_title
            FROM ideas i
            LEFT JOIN principles p ON p.id = i.principle_id
            LEFT JOIN vision v ON v.id = i.vision_id
-           ORDER BY created_at DESC`),
-    dbAll('SELECT * FROM principles ORDER BY position ASC'),
-    dbAll('SELECT * FROM vision ORDER BY position ASC'),
-    dbAll('SELECT * FROM weekly_reviews ORDER BY week DESC'),
-    dbAll('SELECT * FROM docs ORDER BY date DESC, created_at ASC'),
+           WHERE i.user_id = ?
+           ORDER BY created_at DESC`, [req.userId]),
+    dbAll('SELECT * FROM principles WHERE user_id = ? ORDER BY position ASC', [req.userId]),
+    dbAll('SELECT * FROM vision WHERE user_id = ? ORDER BY position ASC', [req.userId]),
+    dbAll('SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY week DESC', [req.userId]),
+    dbAll('SELECT * FROM docs WHERE user_id = ? ORDER BY date DESC, created_at ASC', [req.userId]),
   ]);
 
   let md = `# Stride Export\nGenerated: ${new Date().toISOString().split('T')[0]}\n\n`;

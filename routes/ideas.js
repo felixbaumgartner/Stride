@@ -48,44 +48,39 @@ function normalizeFlag(value, fallback) {
   return value ? 1 : 0;
 }
 
-async function assertLinkedRecord(tableName, id, fieldName) {
+async function assertLinkedRecord(tableName, id, fieldName, userId) {
   if (!id) return;
 
-  const record = await dbGet(`SELECT id FROM ${tableName} WHERE id = ?`, [id]);
+  const record = await dbGet(`SELECT id FROM ${tableName} WHERE id = ? AND user_id = ?`, [id, userId]);
   if (!record) {
     throw new Error(`${fieldName} was not found`);
   }
 }
 
-async function getIdeaById(id) {
-  return dbGet(`${IDEA_SELECT} WHERE i.id = ?`, [id]);
+async function getIdeaById(id, userId) {
+  return dbGet(`${IDEA_SELECT} WHERE i.id = ? AND i.user_id = ?`, [id, userId]);
 }
 
-async function getTaskById(id) {
-  return dbGet(`${TASK_SELECT} WHERE t.id = ?`, [id]);
+async function getTaskById(id, userId) {
+  return dbGet(`${TASK_SELECT} WHERE t.id = ? AND t.user_id = ?`, [id, userId]);
 }
 
 // List ideas (active by default)
 router.get('/', asyncHandler(async (req, res) => {
   const includeConverted = req.query.include_converted === '1' || req.query.all === '1';
   const includeArchived = req.query.include_archived === '1' || req.query.all === '1';
-  const conditions = [];
+  const conditions = ['i.user_id = ?'];
 
   if (!includeConverted) conditions.push('i.converted = 0');
   if (!includeArchived) conditions.push('i.archived = 0');
 
-  let sql = IDEA_SELECT;
-  if (conditions.length) {
-    sql += ` WHERE ${conditions.join(' AND ')}`;
-  }
-
-  sql += ' ORDER BY i.archived ASC, i.converted ASC, i.starred DESC, i.created_at DESC';
-  res.json(await dbAll(sql));
+  const sql = `${IDEA_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY i.archived ASC, i.converted ASC, i.starred DESC, i.created_at DESC`;
+  res.json(await dbAll(sql, [req.userId]));
 }));
 
 // Get single idea
 router.get('/:id', asyncHandler(async (req, res) => {
-  const idea = await getIdeaById(req.params.id);
+  const idea = await getIdeaById(req.params.id, req.userId);
   if (!idea) return res.status(404).json({ error: 'Idea not found' });
   res.json(idea);
 }));
@@ -99,21 +94,21 @@ router.post('/', asyncHandler(async (req, res) => {
   const visionId = normalizeLinkedId(req.body.vision_id, 'Vision');
   const now = new Date().toISOString();
 
-  await assertLinkedRecord('principles', principleId, 'Principle');
-  await assertLinkedRecord('vision', visionId, 'Vision');
+  await assertLinkedRecord('principles', principleId, 'Principle', req.userId);
+  await assertLinkedRecord('vision', visionId, 'Vision', req.userId);
 
   const result = await dbRun(
-    'INSERT INTO ideas (title, details, principle_id, vision_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [title.trim(), details, principleId ?? null, visionId ?? null, now, now]
+    'INSERT INTO ideas (title, details, principle_id, vision_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [title.trim(), details, principleId ?? null, visionId ?? null, req.userId, now, now]
   );
 
-  const idea = await getIdeaById(result.lastInsertRowid);
+  const idea = await getIdeaById(result.lastInsertRowid, req.userId);
   res.status(201).json(idea);
 }));
 
 // Update idea
 router.put('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM ideas WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM ideas WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Idea not found' });
 
   const nextTitle = req.body.title === undefined ? existing.title : String(req.body.title).trim();
@@ -125,93 +120,93 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const resolvedVisionId = nextVisionId === undefined ? existing.vision_id : nextVisionId;
   const now = new Date().toISOString();
 
-  await assertLinkedRecord('principles', resolvedPrincipleId, 'Principle');
-  await assertLinkedRecord('vision', resolvedVisionId, 'Vision');
+  await assertLinkedRecord('principles', resolvedPrincipleId, 'Principle', req.userId);
+  await assertLinkedRecord('vision', resolvedVisionId, 'Vision', req.userId);
 
   await dbRun(
-    'UPDATE ideas SET title = ?, details = ?, principle_id = ?, vision_id = ?, updated_at = ? WHERE id = ?',
-    [nextTitle, req.body.details ?? existing.details, resolvedPrincipleId, resolvedVisionId, now, req.params.id]
+    'UPDATE ideas SET title = ?, details = ?, principle_id = ?, vision_id = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+    [nextTitle, req.body.details ?? existing.details, resolvedPrincipleId, resolvedVisionId, now, req.params.id, req.userId]
   );
 
-  const idea = await getIdeaById(req.params.id);
+  const idea = await getIdeaById(req.params.id, req.userId);
   res.json(idea);
 }));
 
 // Archive or restore idea
 router.patch('/:id/archive', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM ideas WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM ideas WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Idea not found' });
 
   const archived = normalizeFlag(req.body.archived, existing.archived ? 0 : 1);
   const now = new Date().toISOString();
 
-  await dbRun('UPDATE ideas SET archived = ?, updated_at = ? WHERE id = ?', [archived, now, req.params.id]);
+  await dbRun('UPDATE ideas SET archived = ?, updated_at = ? WHERE id = ? AND user_id = ?', [archived, now, req.params.id, req.userId]);
 
-  const idea = await getIdeaById(req.params.id);
+  const idea = await getIdeaById(req.params.id, req.userId);
   res.json(idea);
 }));
 
 // Star or unstar idea
 router.patch('/:id/star', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM ideas WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM ideas WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Idea not found' });
 
   const starred = normalizeFlag(req.body.starred, existing.starred ? 0 : 1);
   const now = new Date().toISOString();
 
-  await dbRun('UPDATE ideas SET starred = ?, updated_at = ? WHERE id = ?', [starred, now, req.params.id]);
+  await dbRun('UPDATE ideas SET starred = ?, updated_at = ? WHERE id = ? AND user_id = ?', [starred, now, req.params.id, req.userId]);
 
-  const idea = await getIdeaById(req.params.id);
+  const idea = await getIdeaById(req.params.id, req.userId);
   res.json(idea);
 }));
 
 // Delete idea
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM ideas WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM ideas WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Idea not found' });
 
-  await dbRun('DELETE FROM ideas WHERE id = ?', [req.params.id]);
+  await dbRun('DELETE FROM ideas WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   res.json({ success: true });
 }));
 
 // Convert idea to task
 router.post('/:id/convert', asyncHandler(async (req, res) => {
-  const idea = await dbGet('SELECT * FROM ideas WHERE id = ?', [req.params.id]);
+  const idea = await dbGet('SELECT * FROM ideas WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!idea) return res.status(404).json({ error: 'Idea not found' });
   if (idea.converted) return res.status(400).json({ error: 'Idea already converted' });
 
   const date = req.body.date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date) ? req.body.date : getTodayDate();
   const now = new Date().toISOString();
+  const userId = req.userId;
 
   const task = await dbTransaction(async ({ dbGet, dbRun }) => {
     if (idea.principle_id) {
-      const principle = await dbGet('SELECT id FROM principles WHERE id = ?', [idea.principle_id]);
+      const principle = await dbGet('SELECT id FROM principles WHERE id = ? AND user_id = ?', [idea.principle_id, userId]);
       if (!principle) throw new Error('Linked principle was not found');
     }
 
     if (idea.vision_id) {
-      const vision = await dbGet('SELECT id FROM vision WHERE id = ?', [idea.vision_id]);
+      const vision = await dbGet('SELECT id FROM vision WHERE id = ? AND user_id = ?', [idea.vision_id, userId]);
       if (!vision) throw new Error('Linked vision was not found');
     }
 
-    const maxPos = await dbGet('SELECT COALESCE(MAX(position), -1) AS max FROM tasks WHERE date = ?', [date]);
+    const maxPos = await dbGet('SELECT COALESCE(MAX(position), -1) AS max FROM tasks WHERE date = ? AND user_id = ?', [date, userId]);
     const position = (maxPos?.max ?? -1) + 1;
 
     const taskResult = await dbRun(
-      'INSERT INTO tasks (title, details, date, source, source_idea_id, principle_id, vision_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [idea.title, idea.details, date, 'idea', idea.id, idea.principle_id, idea.vision_id, position, now, now]
+      'INSERT INTO tasks (title, details, date, source, source_idea_id, principle_id, vision_id, position, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [idea.title, idea.details, date, 'idea', idea.id, idea.principle_id, idea.vision_id, position, userId, now, now]
     );
 
     await dbRun(
-      'UPDATE ideas SET converted = 1, converted_task_id = ?, updated_at = ? WHERE id = ?',
-      [taskResult.lastInsertRowid, now, idea.id]
+      'UPDATE ideas SET converted = 1, converted_task_id = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+      [taskResult.lastInsertRowid, now, idea.id, userId]
     );
 
-    return await dbGet(`${TASK_SELECT} WHERE t.id = ?`, [taskResult.lastInsertRowid]);
+    return await dbGet(`${TASK_SELECT} WHERE t.id = ? AND t.user_id = ?`, [taskResult.lastInsertRowid, userId]);
   });
 
   res.status(201).json(task);
 }));
 
 module.exports = router;
-

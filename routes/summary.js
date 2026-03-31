@@ -25,9 +25,9 @@ router.get('/', asyncHandler(async (req, res) => {
      FROM tasks t
      LEFT JOIN principles p ON p.id = t.principle_id
      LEFT JOIN vision v ON v.id = t.vision_id
-     WHERE t.date >= ? AND t.date <= ?
+     WHERE t.date >= ? AND t.date <= ? AND t.user_id = ?
      ORDER BY t.date ASC, t.focus DESC, t.position ASC`,
-    [from, to]
+    [from, to, req.userId]
   );
 
   const totalTasks = tasks.length;
@@ -60,16 +60,16 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   const ideasCreated = (await dbGet(
-    'SELECT COUNT(*) AS count FROM ideas WHERE created_at >= ? AND created_at <= ?',
-    [`${from}T00:00:00`, `${to}T23:59:59`]
+    'SELECT COUNT(*) AS count FROM ideas WHERE user_id = ? AND created_at >= ? AND created_at <= ?',
+    [req.userId, `${from}T00:00:00`, `${to}T23:59:59`]
   ))?.count || 0;
 
   const ideasConverted = (await dbGet(
-    'SELECT COUNT(*) AS count FROM ideas WHERE converted = 1 AND updated_at >= ? AND updated_at <= ?',
-    [`${from}T00:00:00`, `${to}T23:59:59`]
+    'SELECT COUNT(*) AS count FROM ideas WHERE user_id = ? AND converted = 1 AND updated_at >= ? AND updated_at <= ?',
+    [req.userId, `${from}T00:00:00`, `${to}T23:59:59`]
   ))?.count || 0;
 
-  const review = await dbGet('SELECT * FROM weekly_reviews WHERE week = ?', [week]);
+  const review = await dbGet('SELECT * FROM weekly_reviews WHERE week = ? AND user_id = ?', [week, req.userId]);
 
   res.json({
     week,
@@ -95,21 +95,21 @@ router.put('/review', asyncHandler(async (req, res) => {
   const { week, wins = '', blockers = '', changesSummary = '', nextFocus = '' } = req.body;
   const summaryWeek = week && /^\d{4}-W\d{2}$/.test(week) ? week : getISOWeekInfoFromDate(req.body.date).week;
   const now = new Date().toISOString();
-  const existing = await dbGet('SELECT id FROM weekly_reviews WHERE week = ?', [summaryWeek]);
+  const existing = await dbGet('SELECT id FROM weekly_reviews WHERE week = ? AND user_id = ?', [summaryWeek, req.userId]);
 
   if (existing) {
     await dbRun(
-      'UPDATE weekly_reviews SET wins = ?, blockers = ?, changes_summary = ?, next_focus = ?, updated_at = ? WHERE week = ?',
-      [wins, blockers, changesSummary, nextFocus, now, summaryWeek]
+      'UPDATE weekly_reviews SET wins = ?, blockers = ?, changes_summary = ?, next_focus = ?, updated_at = ? WHERE week = ? AND user_id = ?',
+      [wins, blockers, changesSummary, nextFocus, now, summaryWeek, req.userId]
     );
   } else {
     await dbRun(
-      'INSERT INTO weekly_reviews (week, wins, blockers, changes_summary, next_focus, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [summaryWeek, wins, blockers, changesSummary, nextFocus, now, now]
+      'INSERT INTO weekly_reviews (week, wins, blockers, changes_summary, next_focus, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [summaryWeek, wins, blockers, changesSummary, nextFocus, req.userId, now, now]
     );
   }
 
-  const review = await dbGet('SELECT * FROM weekly_reviews WHERE week = ?', [summaryWeek]);
+  const review = await dbGet('SELECT * FROM weekly_reviews WHERE week = ? AND user_id = ?', [summaryWeek, req.userId]);
   res.json({
     week: summaryWeek,
     review: {

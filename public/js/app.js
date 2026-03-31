@@ -187,7 +187,16 @@ document.querySelectorAll('.tab').forEach((button) => {
 });
 
 Object.values(tabs).forEach(({ module }) => module.init());
-window.runAppAction(() => tabs.tasks.module.load());
+
+// Wait for auth before loading data
+window.Auth.init(() => {
+  window.runAppAction(() => tabs.tasks.module.load());
+});
+
+// Sign out handler
+document.getElementById('sign-out-btn')?.addEventListener('click', () => {
+  window.Auth.signOut();
+});
 
 // Search handler
 (() => {

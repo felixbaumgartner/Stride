@@ -13,24 +13,24 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const [tasks, ideas, principles, vision, docs] = await Promise.all([
     dbAll(
-      'SELECT * FROM tasks WHERE title LIKE ? OR details LIKE ? ORDER BY date DESC, position ASC LIMIT 20',
-      [pattern, pattern]
+      'SELECT * FROM tasks WHERE user_id = ? AND (title LIKE ? OR details LIKE ?) ORDER BY date DESC, position ASC LIMIT 20',
+      [req.userId, pattern, pattern]
     ),
     dbAll(
-      'SELECT * FROM ideas WHERE title LIKE ? OR details LIKE ? ORDER BY created_at DESC LIMIT 20',
-      [pattern, pattern]
+      'SELECT * FROM ideas WHERE user_id = ? AND (title LIKE ? OR details LIKE ?) ORDER BY created_at DESC LIMIT 20',
+      [req.userId, pattern, pattern]
     ),
     dbAll(
-      'SELECT * FROM principles WHERE text LIKE ? OR details LIKE ? ORDER BY position ASC LIMIT 20',
-      [pattern, pattern]
+      'SELECT * FROM principles WHERE user_id = ? AND (text LIKE ? OR details LIKE ?) ORDER BY position ASC LIMIT 20',
+      [req.userId, pattern, pattern]
     ),
     dbAll(
-      'SELECT * FROM vision WHERE title LIKE ? OR details LIKE ? ORDER BY position ASC LIMIT 20',
-      [pattern, pattern]
+      'SELECT * FROM vision WHERE user_id = ? AND (title LIKE ? OR details LIKE ?) ORDER BY position ASC LIMIT 20',
+      [req.userId, pattern, pattern]
     ),
     dbAll(
-      'SELECT * FROM docs WHERE title LIKE ? OR content LIKE ? ORDER BY date DESC LIMIT 20',
-      [pattern, pattern]
+      'SELECT * FROM docs WHERE user_id = ? AND (title LIKE ? OR content LIKE ?) ORDER BY date DESC LIMIT 20',
+      [req.userId, pattern, pattern]
     )
   ]);
 

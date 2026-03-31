@@ -45,20 +45,20 @@ function normalizeFlag(value, fallback) {
   return value ? 1 : 0;
 }
 
-async function assertLinkedRecord(tableName, id, fieldName) {
+async function assertLinkedRecord(tableName, id, fieldName, userId) {
   if (!id) return;
 
-  const record = await dbGet(`SELECT id FROM ${tableName} WHERE id = ?`, [id]);
+  const record = await dbGet(`SELECT id FROM ${tableName} WHERE id = ? AND user_id = ?`, [id, userId]);
   if (!record) {
     throw new Error(`${fieldName} was not found`);
   }
 }
 
-async function assertFocusCapacity(date, excludeTaskId = null) {
+async function assertFocusCapacity(date, userId, excludeTaskId = null) {
   const sql = excludeTaskId
-    ? 'SELECT COUNT(*) AS count FROM tasks WHERE date = ? AND focus = 1 AND id != ?'
-    : 'SELECT COUNT(*) AS count FROM tasks WHERE date = ? AND focus = 1';
-  const params = excludeTaskId ? [date, excludeTaskId] : [date];
+    ? 'SELECT COUNT(*) AS count FROM tasks WHERE date = ? AND focus = 1 AND user_id = ? AND id != ?'
+    : 'SELECT COUNT(*) AS count FROM tasks WHERE date = ? AND focus = 1 AND user_id = ?';
+  const params = excludeTaskId ? [date, userId, excludeTaskId] : [date, userId];
   const result = await dbGet(sql, params);
 
   if ((result?.count || 0) >= 3) {
@@ -66,17 +66,17 @@ async function assertFocusCapacity(date, excludeTaskId = null) {
   }
 }
 
-async function getNextPosition(date, excludeTaskId = null) {
+async function getNextPosition(date, userId, excludeTaskId = null) {
   const sql = excludeTaskId
-    ? 'SELECT COALESCE(MAX(position), -1) AS max FROM tasks WHERE date = ? AND id != ?'
-    : 'SELECT COALESCE(MAX(position), -1) AS max FROM tasks WHERE date = ?';
-  const params = excludeTaskId ? [date, excludeTaskId] : [date];
+    ? 'SELECT COALESCE(MAX(position), -1) AS max FROM tasks WHERE date = ? AND user_id = ? AND id != ?'
+    : 'SELECT COALESCE(MAX(position), -1) AS max FROM tasks WHERE date = ? AND user_id = ?';
+  const params = excludeTaskId ? [date, userId, excludeTaskId] : [date, userId];
   const result = await dbGet(sql, params);
   return (result?.max ?? -1) + 1;
 }
 
-async function getTaskById(id) {
-  return dbGet(`${TASK_SELECT} WHERE t.id = ?`, [id]);
+async function getTaskById(id, userId) {
+  return dbGet(`${TASK_SELECT} WHERE t.id = ? AND t.user_id = ?`, [id, userId]);
 }
 
 // Get unfinished tasks from the last 30 days (covers 1w, 2w, 1m views)
@@ -87,8 +87,8 @@ router.get('/unfinished', asyncHandler(async (req, res) => {
   const fromDate = d.toISOString().split('T')[0];
 
   const tasks = await dbAll(
-    `${TASK_SELECT} WHERE t.completed = 0 AND t.date >= ? AND t.date <= ? ORDER BY t.date DESC, t.focus DESC, t.position ASC`,
-    [fromDate, today]
+    `${TASK_SELECT} WHERE t.completed = 0 AND t.date >= ? AND t.date <= ? AND t.user_id = ? ORDER BY t.date DESC, t.focus DESC, t.position ASC`,
+    [fromDate, today, req.userId]
   );
   res.json(tasks);
 }));
@@ -100,11 +100,14 @@ router.get('/', asyncHandler(async (req, res) => {
   const params = [];
 
   if (from && to) {
-    sql += ' WHERE t.date >= ? AND t.date <= ?';
-    params.push(from, to);
+    sql += ' WHERE t.date >= ? AND t.date <= ? AND t.user_id = ?';
+    params.push(from, to, req.userId);
   } else if (from) {
-    sql += ' WHERE t.date = ?';
-    params.push(from);
+    sql += ' WHERE t.date = ? AND t.user_id = ?';
+    params.push(from, req.userId);
+  } else {
+    sql += ' WHERE t.user_id = ?';
+    params.push(req.userId);
   }
 
   sql += ' ORDER BY t.date DESC, t.focus DESC, t.position ASC, t.created_at DESC';
@@ -114,7 +117,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 // Get single task
 router.get('/:id', asyncHandler(async (req, res) => {
-  const task = await getTaskById(req.params.id);
+  const task = await getTaskById(req.params.id, req.userId);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   res.json(task);
 }));
@@ -130,27 +133,27 @@ router.post('/', asyncHandler(async (req, res) => {
   const focus = normalizeFlag(req.body.focus, 0);
   const now = new Date().toISOString();
 
-  await assertLinkedRecord('principles', principleId, 'Principle');
-  await assertLinkedRecord('vision', visionId, 'Vision');
+  await assertLinkedRecord('principles', principleId, 'Principle', req.userId);
+  await assertLinkedRecord('vision', visionId, 'Vision', req.userId);
 
   if (focus) {
-    await assertFocusCapacity(taskDate);
+    await assertFocusCapacity(taskDate, req.userId);
   }
 
-  const position = await getNextPosition(taskDate);
+  const position = await getNextPosition(taskDate, req.userId);
 
   const result = await dbRun(
-    'INSERT INTO tasks (title, details, date, principle_id, vision_id, focus, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [title.trim(), details, taskDate, principleId ?? null, visionId ?? null, focus, position, now, now]
+    'INSERT INTO tasks (title, details, date, principle_id, vision_id, focus, position, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [title.trim(), details, taskDate, principleId ?? null, visionId ?? null, focus, position, req.userId, now, now]
   );
 
-  const task = await getTaskById(result.lastInsertRowid);
+  const task = await getTaskById(result.lastInsertRowid, req.userId);
   res.status(201).json(task);
 }));
 
 // Update task
 router.put('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
   const nextTitle = req.body.title === undefined ? existing.title : String(req.body.title).trim();
@@ -163,19 +166,19 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const nextVisionId = normalizeLinkedId(req.body.vision_id, 'Vision');
   const resolvedPrincipleId = nextPrincipleId === undefined ? existing.principle_id : nextPrincipleId;
   const resolvedVisionId = nextVisionId === undefined ? existing.vision_id : nextVisionId;
-  const nextPosition = nextDate === existing.date ? existing.position : await getNextPosition(nextDate, existing.id);
+  const nextPosition = nextDate === existing.date ? existing.position : await getNextPosition(nextDate, req.userId, existing.id);
   const now = new Date().toISOString();
 
-  await assertLinkedRecord('principles', resolvedPrincipleId, 'Principle');
-  await assertLinkedRecord('vision', resolvedVisionId, 'Vision');
+  await assertLinkedRecord('principles', resolvedPrincipleId, 'Principle', req.userId);
+  await assertLinkedRecord('vision', resolvedVisionId, 'Vision', req.userId);
 
   const needsFocusCapacity = nextFocus && (!existing.focus || nextDate !== existing.date);
   if (needsFocusCapacity) {
-    await assertFocusCapacity(nextDate, existing.id);
+    await assertFocusCapacity(nextDate, req.userId, existing.id);
   }
 
   await dbRun(
-    'UPDATE tasks SET title = ?, details = ?, date = ?, completed = ?, principle_id = ?, vision_id = ?, focus = ?, position = ?, updated_at = ? WHERE id = ?',
+    'UPDATE tasks SET title = ?, details = ?, date = ?, completed = ?, principle_id = ?, vision_id = ?, focus = ?, position = ?, updated_at = ? WHERE id = ? AND user_id = ?',
     [
       nextTitle,
       req.body.details ?? existing.details,
@@ -187,71 +190,71 @@ router.put('/:id', asyncHandler(async (req, res) => {
       nextPosition,
       now,
       req.params.id,
+      req.userId,
     ]
   );
 
-  const task = await getTaskById(req.params.id);
+  const task = await getTaskById(req.params.id, req.userId);
   res.json(task);
 }));
 
 // Toggle completion
 router.patch('/:id/complete', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
   const completed = normalizeFlag(req.body.completed, existing.completed ? 0 : 1);
   const now = new Date().toISOString();
 
-  await dbRun('UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ?', [completed, now, req.params.id]);
+  await dbRun('UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ? AND user_id = ?', [completed, now, req.params.id, req.userId]);
 
-  const task = await getTaskById(req.params.id);
+  const task = await getTaskById(req.params.id, req.userId);
   res.json(task);
 }));
 
 // Update focus
 router.patch('/:id/focus', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
   const focus = normalizeFlag(req.body.focus, existing.focus ? 0 : 1);
   if (focus && !existing.focus) {
-    await assertFocusCapacity(existing.date, existing.id);
+    await assertFocusCapacity(existing.date, req.userId, existing.id);
   }
 
   const now = new Date().toISOString();
-  await dbRun('UPDATE tasks SET focus = ?, updated_at = ? WHERE id = ?', [focus, now, req.params.id]);
+  await dbRun('UPDATE tasks SET focus = ?, updated_at = ? WHERE id = ? AND user_id = ?', [focus, now, req.params.id, req.userId]);
 
-  const task = await getTaskById(req.params.id);
+  const task = await getTaskById(req.params.id, req.userId);
   res.json(task);
 }));
 
 // Reschedule task
 router.post('/:id/reschedule', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
   const targetDate = normalizeDate(req.body.date);
-  const targetPosition = targetDate === existing.date ? existing.position : await getNextPosition(targetDate, existing.id);
+  const targetPosition = targetDate === existing.date ? existing.position : await getNextPosition(targetDate, req.userId, existing.id);
 
   if (existing.focus && targetDate !== existing.date) {
-    await assertFocusCapacity(targetDate, existing.id);
+    await assertFocusCapacity(targetDate, req.userId, existing.id);
   }
 
   const now = new Date().toISOString();
-  await dbRun('UPDATE tasks SET date = ?, position = ?, updated_at = ? WHERE id = ?', [targetDate, targetPosition, now, req.params.id]);
+  await dbRun('UPDATE tasks SET date = ?, position = ?, updated_at = ? WHERE id = ? AND user_id = ?', [targetDate, targetPosition, now, req.params.id, req.userId]);
 
-  const task = await getTaskById(req.params.id);
+  const task = await getTaskById(req.params.id, req.userId);
   res.json(task);
 }));
 
 // Delete task
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  await dbRun('DELETE FROM tasks WHERE id = ?', [req.params.id]);
+  await dbRun('DELETE FROM tasks WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   res.json({ success: true });
 }));
 
 module.exports = router;
-

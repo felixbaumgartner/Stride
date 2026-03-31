@@ -9,15 +9,15 @@ const asyncHandler = (fn) => (req, res, next) =>
 router.get('/', asyncHandler(async (req, res) => {
   const { date } = req.query;
   if (date) {
-    res.json(await dbAll('SELECT * FROM docs WHERE date = ? ORDER BY created_at ASC', [date]));
+    res.json(await dbAll('SELECT * FROM docs WHERE date = ? AND user_id = ? ORDER BY created_at ASC', [date, req.userId]));
   } else {
-    res.json(await dbAll('SELECT * FROM docs ORDER BY date DESC, created_at ASC'));
+    res.json(await dbAll('SELECT * FROM docs WHERE user_id = ? ORDER BY date DESC, created_at ASC', [req.userId]));
   }
 }));
 
 // Get single doc
 router.get('/:id', asyncHandler(async (req, res) => {
-  const doc = await dbGet('SELECT * FROM docs WHERE id = ?', [req.params.id]);
+  const doc = await dbGet('SELECT * FROM docs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!doc) return res.status(404).json({ error: 'Doc not found' });
   res.json(doc);
 }));
@@ -30,17 +30,17 @@ router.post('/', asyncHandler(async (req, res) => {
 
   const now = new Date().toISOString();
   const result = await dbRun(
-    'INSERT INTO docs (title, content, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-    [title.trim(), content, date, now, now]
+    'INSERT INTO docs (title, content, date, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [title.trim(), content, date, req.userId, now, now]
   );
 
-  const doc = await dbGet('SELECT * FROM docs WHERE id = ?', [result.lastInsertRowid]);
+  const doc = await dbGet('SELECT * FROM docs WHERE id = ? AND user_id = ?', [result.lastInsertRowid, req.userId]);
   res.status(201).json(doc);
 }));
 
 // Update doc
 router.put('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM docs WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM docs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Doc not found' });
 
   const title = req.body.title !== undefined ? String(req.body.title).trim() : existing.title;
@@ -51,20 +51,20 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const now = new Date().toISOString();
 
   await dbRun(
-    'UPDATE docs SET title = ?, content = ?, date = ?, updated_at = ? WHERE id = ?',
-    [title, content, date, now, req.params.id]
+    'UPDATE docs SET title = ?, content = ?, date = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+    [title, content, date, now, req.params.id, req.userId]
   );
 
-  const doc = await dbGet('SELECT * FROM docs WHERE id = ?', [req.params.id]);
+  const doc = await dbGet('SELECT * FROM docs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   res.json(doc);
 }));
 
 // Delete doc
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const existing = await dbGet('SELECT * FROM docs WHERE id = ?', [req.params.id]);
+  const existing = await dbGet('SELECT * FROM docs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   if (!existing) return res.status(404).json({ error: 'Doc not found' });
 
-  await dbRun('DELETE FROM docs WHERE id = ?', [req.params.id]);
+  await dbRun('DELETE FROM docs WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
   res.json({ success: true });
 }));
 

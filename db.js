@@ -116,6 +116,14 @@ async function initDb() {
   await ensureColumn('ideas', 'vision_id', 'INTEGER');
   await ensureColumn('ideas', 'starred', 'INTEGER DEFAULT 0');
 
+  // User isolation
+  await ensureColumn('tasks', 'user_id', 'TEXT');
+  await ensureColumn('ideas', 'user_id', 'TEXT');
+  await ensureColumn('principles', 'user_id', 'TEXT');
+  await ensureColumn('vision', 'user_id', 'TEXT');
+  await ensureColumn('docs', 'user_id', 'TEXT');
+  await ensureColumn('weekly_reviews', 'user_id', 'TEXT');
+
   await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_tasks_focus_date ON tasks(date, focus)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_ideas_converted ON ideas(converted)');

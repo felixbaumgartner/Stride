@@ -1,7 +1,11 @@
 window.API = (() => {
   async function request(url, options = {}) {
+    const token = window.Auth?.getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       ...options,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
@@ -122,7 +126,10 @@ window.API = (() => {
     },
 
     async exportMarkdown() {
-      const res = await fetch('/api/export');
+      const token = window.Auth?.getToken();
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/export', { headers });
       if (!res.ok) throw new Error('Export failed');
       return res.blob();
     },

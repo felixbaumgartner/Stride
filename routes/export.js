@@ -80,7 +80,8 @@ router.get('/', asyncHandler(async (req, res) => {
   if (docs.length) {
     md += '## Docs\n\n';
     for (const doc of docs) {
-      md += `### [${doc.date}] ${doc.title}\n`;
+      const docLabel = doc.title === doc.date ? doc.date : `[${doc.date}] ${doc.title}`;
+      md += `### ${docLabel}\n`;
       if (doc.content) md += `${doc.content}\n`;
       md += '\n';
     }

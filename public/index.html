@@ -136,13 +136,11 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
           <button class="date-btn today-btn" id="docs-today">Today</button>
+          <input type="date" class="docs-date-picker" id="docs-date-picker" title="Jump to date" />
         </div>
-        <div id="docs-list" class="item-list"></div>
-        <div class="add-bar">
-          <input type="text" id="doc-input" class="add-input" placeholder="Add a doc title..." />
-          <button class="add-btn" id="add-doc-btn" aria-label="Add doc">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
+        <div class="docs-editor-wrap">
+          <textarea id="docs-editor" class="docs-editor" placeholder="Start writing..."></textarea>
+          <span class="docs-save-status" id="docs-save-status"></span>
         </div>
       </section>
     </main>

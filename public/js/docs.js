@@ -1,6 +1,7 @@
 window.DocsTab = (() => {
   let currentDate = window.DateUtils.today();
-  let docs = [];
+  let currentDocId = null;
+  let saveTimer = null;
 
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -9,103 +10,94 @@ window.DocsTab = (() => {
     return `${MONTHS[month - 1]} ${day}, ${year}`;
   }
 
-  function render() {
-    const list = document.getElementById('docs-list');
-
-    if (docs.length === 0) {
-      list.innerHTML = '<div class="empty-state">No docs for this day. Start writing below.</div>';
-      return;
-    }
-
-    list.innerHTML = docs.map((doc) => `
-      <div class="item-card doc-card" data-id="${doc.id}">
-        <div class="item-main">
-          <span class="item-title">${escapeHtml(doc.title)}</span>
-          <div class="item-actions">
-            <button class="action-btn" data-action="edit" title="Edit">&#9998;</button>
-            <button class="action-btn delete-btn" data-action="delete" title="Delete">&#10005;</button>
-          </div>
-        </div>
-        ${doc.content ? `<div class="item-details visible doc-content">${escapeHtml(doc.content)}</div>` : ''}
-      </div>
-    `).join('');
+  function setStatus(text) {
+    const el = document.getElementById('docs-save-status');
+    el.textContent = text;
+    el.classList.toggle('visible', Boolean(text));
   }
 
-  function handleClick(event) {
-    const action = event.target.dataset.action || event.target.closest('[data-action]')?.dataset.action;
-    if (!action) return;
+  async function autoSave() {
+    const editor = document.getElementById('docs-editor');
+    const content = editor.value;
 
-    const card = event.target.closest('.item-card');
-    if (!card) return;
-    const id = Number(card.dataset.id);
-    const doc = docs.find((item) => item.id === id);
-    if (!doc) return;
+    if (!content.trim() && !currentDocId) return;
 
-    if (action === 'edit') {
-      window.AppModal.open({
-        title: 'Edit Doc',
-        name: doc.title,
-        details: doc.content,
-        fields: { date: doc.date },
-        onSave: (values) => window.runAppAction(async () => {
-          await API.updateDoc(id, {
-            title: values.name,
-            content: values.details,
-            date: values.date,
-          });
-          await load();
-        }),
-      });
-      return;
-    }
-
-    if (action === 'delete') {
-      window.AppModal.confirmDelete(() => window.runAppAction(async () => {
-        await API.deleteDoc(id);
-        await load();
-      }));
+    setStatus('Saving...');
+    try {
+      if (!currentDocId) {
+        const doc = await API.createDoc({ title: currentDate, content, date: currentDate });
+        currentDocId = doc.id;
+      } else {
+        await API.updateDoc(currentDocId, { content });
+      }
+      setStatus('Saved');
+      setTimeout(() => setStatus(''), 2000);
+    } catch {
+      setStatus('Save failed');
     }
   }
 
-  async function addDoc() {
-    const input = document.getElementById('doc-input');
-    const title = input.value.trim();
-    if (!title) return;
+  function scheduleAutoSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      window.runAppAction(() => autoSave());
+    }, 1000);
+  }
 
-    input.value = '';
-    await API.createDoc({ title, date: currentDate });
-    await load();
+  function flushSave() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      const editor = document.getElementById('docs-editor');
+      if (currentDocId || editor.value.trim()) {
+        autoSave();
+      }
+    }
   }
 
   async function load() {
     document.getElementById('docs-date').textContent = formatDate(currentDate);
-    docs = await API.getDocs(currentDate);
-    render();
+    document.getElementById('docs-date-picker').value = currentDate;
+
+    clearTimeout(saveTimer);
+    saveTimer = null;
+
+    const docs = await API.getDocs(currentDate);
+    const editor = document.getElementById('docs-editor');
+
+    if (docs.length > 0) {
+      currentDocId = docs[0].id;
+      editor.value = docs[0].content || '';
+    } else {
+      currentDocId = null;
+      editor.value = '';
+    }
+  }
+
+  function changeDate(newDate) {
+    flushSave();
+    currentDate = newDate;
+    window.runAppAction(() => load());
   }
 
   function init() {
     document.getElementById('docs-prev').addEventListener('click', () => {
-      currentDate = window.DateUtils.shift(currentDate, -1);
-      window.runAppAction(() => load());
+      changeDate(window.DateUtils.shift(currentDate, -1));
     });
 
     document.getElementById('docs-next').addEventListener('click', () => {
-      currentDate = window.DateUtils.shift(currentDate, 1);
-      window.runAppAction(() => load());
+      changeDate(window.DateUtils.shift(currentDate, 1));
     });
 
     document.getElementById('docs-today').addEventListener('click', () => {
-      currentDate = window.DateUtils.today();
-      window.runAppAction(() => load());
+      changeDate(window.DateUtils.today());
     });
 
-    document.getElementById('docs-list').addEventListener('click', handleClick);
-    document.getElementById('add-doc-btn').addEventListener('click', () => window.runAppAction(() => addDoc()));
-    document.getElementById('doc-input').addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        window.runAppAction(() => addDoc());
-      }
+    document.getElementById('docs-date-picker').addEventListener('change', (e) => {
+      if (e.target.value) changeDate(e.target.value);
     });
+
+    document.getElementById('docs-editor').addEventListener('input', scheduleAutoSave);
   }
 
   return { init, load };

@@ -966,6 +966,34 @@ body {
   box-shadow: 0 0 0 4px var(--accent-light), 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+.horizon-date {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--separator-strong);
+  border-radius: 50px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 150px;
+}
+
+.horizon-date:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-light), 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.horizon-date::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
 .add-btn {
   width: 48px;
   height: 48px;

@@ -12,6 +12,8 @@ window.AppModal = (() => {
   const dateInput = document.getElementById('modal-date');
   const horizonWrap = document.getElementById('modal-horizon-wrap');
   const horizonInput = document.getElementById('modal-horizon');
+  const targetDateWrap = document.getElementById('modal-target-date-wrap');
+  const targetDateInput = document.getElementById('modal-target-date');
   const linksWrap = document.getElementById('modal-links-wrap');
   const principleSelect = document.getElementById('modal-principle');
   const visionSelect = document.getElementById('modal-vision');
@@ -38,6 +40,7 @@ window.AppModal = (() => {
       details: detailsInput.value.trim(),
       date: dateInput.value,
       horizon: horizonInput.value,
+      targetDate: targetDateInput.value,
       principleId: principleSelect.value ? Number(principleSelect.value) : null,
       visionId: visionSelect.value ? Number(visionSelect.value) : null,
       focus: focusInput.checked,
@@ -73,6 +76,9 @@ window.AppModal = (() => {
 
     setVisibility(horizonWrap, Object.prototype.hasOwnProperty.call(fields, 'horizon'));
     horizonInput.value = fields.horizon || '';
+
+    setVisibility(targetDateWrap, Object.prototype.hasOwnProperty.call(fields, 'targetDate'));
+    targetDateInput.value = fields.targetDate || '';
 
     const shouldShowLinks = options.principles || options.vision;
     setVisibility(linksWrap, Boolean(shouldShowLinks));

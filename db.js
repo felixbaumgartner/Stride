@@ -78,6 +78,7 @@ async function initDb() {
       title TEXT NOT NULL,
       details TEXT DEFAULT '',
       time_horizon TEXT DEFAULT '',
+      target_date TEXT DEFAULT '',
       position INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -115,6 +116,7 @@ async function initDb() {
   await ensureColumn('ideas', 'principle_id', 'INTEGER');
   await ensureColumn('ideas', 'vision_id', 'INTEGER');
   await ensureColumn('ideas', 'starred', 'INTEGER DEFAULT 0');
+  await ensureColumn('vision', 'target_date', 'TEXT DEFAULT \'\'');
 
   // User isolation
   await ensureColumn('tasks', 'user_id', 'TEXT');

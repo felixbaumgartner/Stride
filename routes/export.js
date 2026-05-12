@@ -74,6 +74,7 @@ router.get('/', asyncHandler(async (req, res) => {
   for (const v of vision) {
     md += `### ${v.title}\n`;
     if (v.time_horizon) md += `- Horizon: ${v.time_horizon}\n`;
+    if (v.target_date) md += `- Target date: ${v.target_date}\n`;
     if (v.details) md += `- Details: ${v.details}\n`;
     md += '\n';
   }

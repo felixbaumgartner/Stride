@@ -7,10 +7,11 @@ window.VisionTab = (() => {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function badgeText(entry) {
-    if (entry.target_date) return `By ${formatTargetDate(entry.target_date)}`;
-    if (entry.time_horizon) return entry.time_horizon;
-    return '';
+  function renderBadges(entry) {
+    const badges = [];
+    if (entry.time_horizon) badges.push(entry.time_horizon);
+    if (entry.target_date) badges.push(`By ${formatTargetDate(entry.target_date)}`);
+    return badges.map((text) => `<span class="horizon-badge">${escapeHtml(text)}</span>`).join('');
   }
 
   function render() {
@@ -21,13 +22,11 @@ window.VisionTab = (() => {
       return;
     }
 
-    list.innerHTML = entries.map((entry) => {
-      const badge = badgeText(entry);
-      return `
+    list.innerHTML = entries.map((entry) => `
       <div class="item-card" data-id="${entry.id}">
         <div class="item-main">
           <span class="item-title">${escapeHtml(entry.title)}</span>
-          ${badge ? `<span class="horizon-badge">${escapeHtml(badge)}</span>` : ''}
+          <span class="horizon-badges">${renderBadges(entry)}</span>
           <div class="item-actions">
             <button class="action-btn" data-action="edit" title="Edit">&#9998;</button>
             <button class="action-btn delete-btn" data-action="delete" title="Delete">&#10005;</button>
@@ -35,8 +34,7 @@ window.VisionTab = (() => {
         </div>
         ${entry.details ? `<div class="item-details visible">${escapeHtml(entry.details)}</div>` : ''}
       </div>
-    `;
-    }).join('');
+    `).join('');
   }
 
   function handleClick(event) {

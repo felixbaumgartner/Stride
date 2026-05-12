@@ -816,6 +816,17 @@ body {
   flex-shrink: 0;
 }
 
+.horizon-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.horizon-badges:empty {
+  display: none;
+}
+
 /* ========== ITEM ACTIONS ========== */
 .item-actions {
   display: flex;

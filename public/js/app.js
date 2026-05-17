@@ -171,6 +171,7 @@ const tabs = {
   ideas: { panel: document.getElementById('ideas-panel'), module: window.IdeasTab },
   principles: { panel: document.getElementById('principles-panel'), module: window.PrinciplesTab },
   vision: { panel: document.getElementById('vision-panel'), module: window.VisionTab },
+  alignment: { panel: document.getElementById('alignment-panel'), module: window.AlignmentTab },
   docs: { panel: document.getElementById('docs-panel'), module: window.DocsTab },
 };
 

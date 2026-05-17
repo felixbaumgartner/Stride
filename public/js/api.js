@@ -128,6 +128,10 @@ window.API = (() => {
       return request(`/api/search?q=${encodeURIComponent(query)}`);
     },
 
+    getAlignment(period = '30d') {
+      return request(`/api/alignment?period=${encodeURIComponent(period)}`);
+    },
+
     async exportMarkdown() {
       const token = window.Auth?.getToken();
       const headers = {};

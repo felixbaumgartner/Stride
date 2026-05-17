@@ -11,7 +11,6 @@ const summaryRouter = require('./routes/summary');
 const exportRouter = require('./routes/export');
 const docsRouter = require('./routes/docs');
 const searchRouter = require('./routes/search');
-const alignmentRouter = require('./routes/alignment');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -65,7 +64,6 @@ app.use('/api/docs', docsRouter);
 app.use('/api/summary', summaryRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/search', searchRouter);
-app.use('/api/alignment', alignmentRouter);
 
 app.use((err, req, res, next) => {
   const message = err?.message || 'Unexpected server error';

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { dbAll, dbGet, dbRun } = require('../db');
-const { getTodayDate } = require('../date-utils');
+const { getTodayDate, shiftISODate } = require('../date-utils');
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -91,6 +91,32 @@ router.get('/unfinished', asyncHandler(async (req, res) => {
     [fromDate, today, req.userId]
   );
   res.json(tasks);
+}));
+
+// Most recent prior day with unfinished tasks, within a lookback window
+router.get('/carryover', asyncHandler(async (req, res) => {
+  const { before } = req.query;
+  if (!before || !/^\d{4}-\d{2}-\d{2}$/.test(before)) {
+    return res.status(400).json({ error: 'A valid "before" date is required' });
+  }
+  const within = Math.min(Math.max(Number(req.query.within) || 7, 1), 30);
+  const lowerBound = shiftISODate(before, -within);
+
+  const recent = await dbGet(
+    'SELECT date FROM tasks WHERE user_id = ? AND completed = 0 AND date < ? AND date >= ? ORDER BY date DESC LIMIT 1',
+    [req.userId, before, lowerBound]
+  );
+
+  if (!recent) {
+    return res.json({ sourceDate: null, tasks: [] });
+  }
+
+  const tasks = await dbAll(
+    `${TASK_SELECT} WHERE t.user_id = ? AND t.date = ? AND t.completed = 0 ORDER BY t.focus DESC, t.position ASC`,
+    [req.userId, recent.date]
+  );
+
+  res.json({ sourceDate: recent.date, tasks });
 }));
 
 // List tasks, optionally filtered by date range

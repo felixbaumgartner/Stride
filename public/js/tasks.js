@@ -2,6 +2,7 @@ window.TasksTab = (() => {
   let currentDate = window.DateUtils.today();
   let tasks = [];
   let carryoverTasks = [];
+  let carryoverSourceDate = null;
   let principles = [];
   let vision = [];
 
@@ -32,20 +33,31 @@ window.TasksTab = (() => {
     `;
   }
 
+  function daysBetweenISO(fromISO, toISO) {
+    const [y1, m1, d1] = fromISO.split('-').map(Number);
+    const [y2, m2, d2] = toISO.split('-').map(Number);
+    const from = new Date(y1, m1 - 1, d1);
+    const to = new Date(y2, m2 - 1, d2);
+    return Math.round((to - from) / 86400000);
+  }
+
   function renderCarryover() {
     const banner = document.getElementById('carryover-banner');
 
-    if (!carryoverTasks.length) {
+    if (!carryoverTasks.length || !carryoverSourceDate) {
       banner.classList.add('hidden');
       banner.innerHTML = '';
       return;
     }
 
+    const gap = daysBetweenISO(carryoverSourceDate, currentDate);
+    const gapSuffix = gap > 1 ? ` <span class="carryover-gap">(${gap} days ago)</span>` : '';
+
     banner.classList.remove('hidden');
     banner.innerHTML = `
       <div class="carryover-header">
         <div>
-          <div class="carryover-title">Unfinished from ${formatDate(window.DateUtils.shift(currentDate, -1))}</div>
+          <div class="carryover-title">Unfinished from ${formatDate(carryoverSourceDate)}${gapSuffix}</div>
           <div class="carryover-copy">Move what still matters into ${formatDate(currentDate)}.</div>
         </div>
         <button class="ghost-btn" data-action="carryover-all">Move all here</button>
@@ -391,14 +403,14 @@ window.TasksTab = (() => {
     document.getElementById('current-date').textContent = formatDate(currentDate);
     await ensureLookups();
 
-    const previousDate = window.DateUtils.shift(currentDate, -1);
-    const [currentTasks, previousTasks] = await Promise.all([
+    const [currentTasks, carryover] = await Promise.all([
       API.getTasks(currentDate),
-      API.getTasks(previousDate),
+      API.getCarryover(currentDate, 7),
     ]);
 
     tasks = currentTasks;
-    carryoverTasks = previousTasks.filter((task) => !task.completed);
+    carryoverTasks = carryover.tasks || [];
+    carryoverSourceDate = carryover.sourceDate || null;
 
     renderCarryover();
     renderFocusSummary();

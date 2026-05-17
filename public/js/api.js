@@ -25,6 +25,9 @@ window.API = (() => {
     getUnfinishedTasks() {
       return request('/api/tasks/unfinished');
     },
+    getCarryover(beforeDate, within = 7) {
+      return request(`/api/tasks/carryover?before=${encodeURIComponent(beforeDate)}&within=${within}`);
+    },
     createTask(body) {
       return request('/api/tasks', { method: 'POST', body });
     },
